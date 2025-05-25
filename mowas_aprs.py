@@ -1,5 +1,15 @@
 #!/bin/env python3
 
+from aioax25.aprs.datetime import DHMUTCTimestamp
+from aioax25.aprs.frame import APRSFrame
+from aioax25.aprs.position import APRSLatitude
+from aioax25.aprs.position import APRSLongitude
+from aioax25.aprs.position import APRSUncompressedCoordinates
+# from aioax25.aprs.position import APRSCompressedLatitude
+# from aioax25.aprs.position import APRSCompressedLongitude
+# from aioax25.aprs.position import APRSCompressedCoordinates
+from aioax25.aprs.symbol import APRSSymbol
+from aioax25.frame import AX25Address
 import argparse
 import datetime
 import json
@@ -72,6 +82,19 @@ parser.add_argument(
     type = str,
     default = 'MOWA-',
     help = "Präfix für MoWaS-Beacons")
+
+parser.add_argument(
+    '--mycall',
+    type = str,
+    required = True,
+    help = "Rufzeichen der aussendenden Station")
+
+parser.add_argument(
+    '--dstcall',
+    type = str,
+    default = 'APMOWA',
+    help = "Gerätetype in Form eines 'Zielrufzeichens'")
+
 
 ARGS = parser.parse_args()
 
@@ -277,7 +300,7 @@ for w in WARNINGS_FILTER.values():
 
     for info in w['info']:
         # Einheitssymbol
-        symbol = '\\\''
+        symbol = APRSSymbol('\\', '\'')
 
         # Position bestimmen
         if ARGS.no_position:
@@ -331,13 +354,36 @@ for w in WARNINGS_FILTER.values():
 
             packet = ':BLN0MOWAS:' + comment.replace('|', '').replace('~', '')
             APRS.append(packet)
+
         else:
             # Bake
             for p in pos:
-                packet = ''
                 call = ARGS.beacon_prefix
                 call += ('%d' % IDX)[len(call) - 9:]
                 IDX += 1
+
+                lat = (p.GetY() +  90.0) % 180 -  90.0
+                lon = (p.GetX() + 180.0) % 360 - 180.0
+
+                coord = APRSUncompressedCoordinates(
+                    lat = APRSLatitude(lat),
+                    lng = APRSLongitude(lon),
+                    symbol = symbol
+                )
+                # coord = APRSCompressedCoordinates(
+                #     lat = APRSCompressedLatitude(lat),
+                #     lng = APRSCompressedLongitude(lon),
+                #     symbol = symbol
+                # )
+
+                if time is not None:
+                    time = DHMUTCTimestamp(
+                        day = time.day,
+                        hour = time.hour,
+                        minute = time.minute
+                    )
+
+                packet = ''
                 if time is None:
                     packet += ')'
                     packet += call.ljust(3)
@@ -346,21 +392,9 @@ for w in WARNINGS_FILTER.values():
                     packet += ';'
                     packet += call.ljust(9)
                     packet += '_' if cancel else '*'
-                    packet += '%02d%02d%02dz' % ( time.day, time.hour, time.minute )
+                    packet += str(time)
 
-                lat = (p.GetY() +  90.0) % 180 -  90.0
-                lon = (p.GetX() + 180.0) % 360 - 180.0
-                latdeg = int(abs(lat))
-                latmin = 60.0 * (abs(lat) - float(latdeg))
-                londeg = int(abs(lon))
-                lonmin = 60.0 * (abs(lon) - float(londeg))
-
-                packet += '%02d%05.2f' % ( latdeg, latmin )
-                packet += 'N' if lat >= 0 else 'S'
-                packet += symbol[0]
-                packet += '%03d%05.2f' % ( londeg, lonmin )
-                packet += 'E' if lat >= 0 else 'W'
-                packet += symbol[1]
+                packet += str(coord)
 
                 if comment is None:
                     if cancel:
@@ -369,4 +403,14 @@ for w in WARNINGS_FILTER.values():
                         packet += "Unspezifische MoWaS-Entwarnung"
                 else:
                     packet += comment
+
                 APRS.append(packet)
+
+
+for p in APRS:
+    f = APRSFrame(
+        ARGS.dstcall,
+        ARGS.mycall,
+        p.encode(),
+        repeaters = [ AX25Address('WIDE1-1'), AX25Address('WIDE2-2') ],
+    )
