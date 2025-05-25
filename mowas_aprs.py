@@ -18,6 +18,7 @@ from osgeo import osr
 import pytz
 import requests
 import serial
+import socket
 import sys
 
 
@@ -85,6 +86,19 @@ parser.add_argument(
     nargs = '+',
     default = [ 0 ],
     help = "KISS-Ports, an die die Pakete per serieller Schnittstelle geschickt werden sollen")
+
+parser.add_argument(
+    '-T', '--kiss-tcp',
+    type = str,
+    metavar = "HOST:PORT",
+    help = "Netzwerkadresse für TCP-basierte KISS-Schnittstelle")
+
+parser.add_argument(
+    '--kiss-port-tcp',
+    type = int,
+    nargs = '+',
+    default = [ 0 ],
+    help = "KISS-Ports, an die die Pakete per TCP-Schnittstelle geschickt werden sollen")
 
 parser.add_argument(
     '--no-position',
@@ -466,3 +480,17 @@ def kiss_data(frames, ports):
 if ARGS.kiss_serial is not None:
     with serial.Serial(ARGS.kiss_serial, ARGS.baudrate) as kissconn:
         kissconn.write(kiss_data(FRAMES, ARGS.kiss_port_serial))
+
+if ARGS.kiss_tcp is not None:
+    if ':' in ARGS.kiss_tcp:
+        host, port = ARGS.kiss_tcp.split(':')[0:2]
+    else:
+        host = ARGS.kiss_tcp
+        port = 8001
+
+    sock = socket.socket()
+    sock.connect(( host, port ))
+    sock.shutdown(socket.SHUT_RD)
+    sock.send(kiss_data(FRAMES, ARGS.kiss_port_tcp))
+    sock.shutdown(socket.SHUT_WR)
+    sock.close()
