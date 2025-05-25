@@ -17,6 +17,7 @@ from osgeo import ogr
 from osgeo import osr
 import pytz
 import requests
+import serial
 import sys
 
 
@@ -68,6 +69,24 @@ parser.add_argument(
     help = "Erweiterte CAP-Daten des DARC-Datensatzes herunterladen")
 
 parser.add_argument(
+    '-S', '--kiss-serial',
+    type = str,
+    help = "Serielle Schnittstelle für KISS-Modem")
+
+parser.add_argument(
+    '--baudrate',
+    type = int,
+    default = 115200,
+    help = "Baudrate KISS-Modem")
+
+parser.add_argument(
+    '--kiss-port-serial',
+    type = int,
+    nargs = '+',
+    default = [ 0 ],
+    help = "KISS-Ports, an die die Pakete per serieller Schnittstelle geschickt werden sollen")
+
+parser.add_argument(
     '--no-position',
     action = 'store_true',
     help = "Warnung niemals mit Ortsbezug aussenden sondern generell als Bulletins")
@@ -94,6 +113,12 @@ parser.add_argument(
     type = str,
     default = 'APMOWA',
     help = "Gerätetype in Form eines 'Zielrufzeichens'")
+
+parser.add_argument(
+    '-d', '--digipath',
+    type = str,
+    default = [ 'WIDE1-1' ],
+    help = "Digipath für APRS-Frames")
 
 
 ARGS = parser.parse_args()
@@ -289,7 +314,7 @@ for identifier, w in WARNINGS.items():
 # APRS-Meldung formatieren
 #
 
-APRS = []
+FRAMES = []
 IDX = 0
 
 for w in WARNINGS_FILTER.values():
@@ -353,7 +378,15 @@ for w in WARNINGS_FILTER.values():
                 continue
 
             packet = ':BLN0MOWAS:' + comment.replace('|', '').replace('~', '')
-            APRS.append(packet)
+
+            FRAMES.append(
+                APRSFrame(
+                    ARGS.dstcall,
+                    ARGS.mycall,
+                    packet.encode(),
+                    repeaters = [ AX25Address(addr) for addr in ARGS.digipath ]
+                )
+            )
 
         else:
             # Bake
@@ -404,13 +437,32 @@ for w in WARNINGS_FILTER.values():
                 else:
                     packet += comment
 
-                APRS.append(packet)
+                FRAMES.append(
+                    APRSFrame(
+                        ARGS.dstcall,
+                        ARGS.mycall,
+                        packet.encode(),
+                        repeaters = [ AX25Address(addr) for addr in ARGS.digipath ]
+                    )
+                )
 
 
-for p in APRS:
-    f = APRSFrame(
-        ARGS.dstcall,
-        ARGS.mycall,
-        p.encode(),
-        repeaters = [ AX25Address('WIDE1-1'), AX25Address('WIDE2-2') ],
-    )
+
+#
+# Frames per KISS über TNC oder TCP-Socket ausgeben
+#
+
+def kiss_data(frames, ports):
+    kissstr = b'\xc0'
+
+    for p in ports:
+        for f in frames:
+            kissstr += bytes([ 16 * (p % 16) ])
+            kissstr += bytes(f).replace(b'\xdb', b'\xdb\xdd').replace(b'\xc0', b'\xdb\xdc')
+            kissstr += b'\xc0'
+
+    return kissstr
+
+if ARGS.kiss_serial is not None:
+    with serial.Serial(ARGS.kiss_serial, ARGS.baudrate) as kissconn:
+        kissconn.write(kiss_data(FRAMES, ARGS.kiss_port_serial))
