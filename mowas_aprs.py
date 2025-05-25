@@ -467,10 +467,10 @@ for w in WARNINGS_FILTER.values():
 #
 
 def kiss_data(frames, ports):
-    kissstr = b'\xc0'
-
+    kissstr = bytes()
     for p in ports:
         for f in frames:
+            kissstr += b'\xc0'
             kissstr += bytes([ 16 * (p % 16) ])
             kissstr += bytes(f).replace(b'\xdb', b'\xdb\xdd').replace(b'\xc0', b'\xdb\xdc')
             kissstr += b'\xc0'
