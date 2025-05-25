@@ -16,6 +16,7 @@ import json
 from osgeo import ogr
 from osgeo import osr
 import pytz
+import re
 import requests
 import serial
 import socket
@@ -379,6 +380,22 @@ for w in WARNINGS_FILTER.values():
         comment = ''
         if 'headline' in info:
             comment += info['headline']
+
+        # Unicode-Umlaute werden auf Mobilgeräten evt. nicht korrekt
+        # dargestellt.
+        comment = re.sub(r'A([A-Z])', r'AE\1', comment)
+        comment = re.sub(r'Ö([A-Z])', r'OE\1', comment)
+        comment = re.sub(r'Ü([A-Z])', r'UE\1', comment)
+        comment = re.sub(r'([A-Z])A', r'AE\1', comment)
+        comment = re.sub(r'([A-Z])Ö', r'OE\1', comment)
+        comment = re.sub(r'([A-Z])Ü', r'UE\1', comment)
+        comment = comment.replace("Ä", "Ae")
+        comment = comment.replace("Ö", "Oe")
+        comment = comment.replace("Ü", "Ue")
+        comment = comment.replace("ä", "ae")
+        comment = comment.replace("ö", "oe")
+        comment = comment.replace("ü", "ue")
+        comment = comment.replace("ß", "ss")
 
         if comment.strip() == '':
             comment = None
