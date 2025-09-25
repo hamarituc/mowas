@@ -15,6 +15,25 @@ class JSONDateTimeEncoder(json.JSONEncoder):
 
 
 
+def parse_time(s):
+    match = re.fullmatch('([0-9]+)([mhdw]?)', s)
+    if match is None:
+        raise ValueError("Ungültiges Zeitintervall '%s'" % s)
+
+    t = datetime.timedelta(minutes = int(match[1]))
+
+    unit = match[2]
+    if unit == 'h':
+        t *= 60
+    elif unit == 'd':
+        t *= 60 * 24
+    elif unit == 'w':
+        t *= 60 * 24 * 7
+
+    return t
+
+
+
 class Alert:
     def __init__(self, capdata):
         self.attrs = {}
@@ -114,6 +133,7 @@ class Cache:
             sys.exit(-1)
 
         self.path = os.path.join(config['path'])
+        self.age  = parse_time(config.get('purge', '31d'))
 
         if os.path.isfile(self.path):
             with open(self.path) as f:
@@ -137,9 +157,43 @@ class Cache:
             json.dump(data, f, cls = JSONDateTimeEncoder, indent = 2)
 
 
+    def purge(self):
+        thresh = datetime.datetime.now(datetime.timezone.utc) - self.age
+
+        valid = set()
+        remove = set()
+
+        # Veraltete Warnungen bestimmen
+        for alert in self.alerts.values():
+            if alert.capdata['sent'] >= thresh:
+                valid.add(alert.aid)
+            else:
+                remove.add(alert.aid)
+
+        # Wir löschen veraltete Warnungen nur, wenn keine gültige Warnung mehr
+        # auf sie verweist.
+        for aid in valid:
+            alert = self.alerts[aid]
+
+            if 'references' not in alert.capdata:
+                continue
+
+            references = alert.capdata['references']
+            for ref in references.split():
+                ref_sender, ref_aid, ref_sent = ref.split(',')
+                remove.discard(ref_aid)
+
+        for aid in remove:
+            del self.alerts[aid]
+
+        return valid
+
+
 
 # Konfiguration einlesen
 with open('mowas.yml') as f:
     CONFIG = yaml.safe_load(f)
 
 CACHE = Cache(CONFIG.get('cache', {}))
+
+valid  = CACHE.purge()
