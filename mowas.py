@@ -189,6 +189,90 @@ class Cache:
         return valid
 
 
+    #
+    # Wir weisen den Warnungen einen persistente ID zu. Zweck dieser ID ist es,
+    # Warnungen eindeutig zu nummerieren. Die Nummerierung wird
+    # wiederverwendet. Ziel ist es lediglich, dass eine Warnung, so lange sie
+    # aktiv ist, die selbe Nummer erhält. Dies ist notwendig, um z.B.
+    # APRS-Meldungen regelmäßig als Bake mit konsistenzen Bezeichnern
+    # auszusenden.
+    #
+    # Eine Warnungen kann dabei eine Menge von Persistent-IDs erhalten. Das
+    # trifft z.B. dann zu, wenn zwei Warnungen mit unterschiedlichen
+    # Persistent-IDs durch eine Aktualisierung referenziert werden. Die
+    # Aktualisierung erhält dann die beiden ursprünglichen Persistent-IDs.
+    #
+    def persistent_ids(self):
+        nopids = {}
+        pids   = {}
+        refs   = {}
+
+        for aid, alert in self.alerts.items():
+            pid = alert.attr_get('pids')
+            if pid is None:
+                # Warnungen ohne Persistent-ID sammeln
+                nopids[aid] = alert
+            else:
+                # Bestehende Persistent-IDs sammeln
+                pids[aid] = pid
+
+            refs[aid] = set()
+            if 'references' in alert.capdata:
+                for ref in alert.capdata['references'].split():
+                    ref_sender, ref_aid, ref_sent = ref.split(',')
+
+                    # Warnungen überspringen, die nicht mehr vorliegen
+                    if ref_aid not in self.alerts:
+                        continue
+
+                    refs[aid].add(ref_aid)
+
+        # Belegte Persistent-IDs bestimmen
+        usedpids = set()
+        for pid in pids.values():
+            usedpids |= set(pid)
+
+        # Freie Persistent-IDs bestimmen
+        if len(usedpids) == 0:
+            freepids = list(range(1, len(nopids) + 1))
+        else:
+            freepids = sorted(set(range(1, max(usedpids) + 1)) - usedpids)[:len(nopids)]
+            if len(freepids) < len(nopids):
+                freepids.extend(range(max(usedpids) + 1, max(usedpids) + len(nopids) - len(freepids) + 1))
+
+        # Warnungen ohne Persistent-ID taggen
+        rerun = True
+        while rerun:
+            rerun = False
+            nopids_new = {}
+            for aid, alert in nopids.items():
+                if refs[aid] - set(pids.keys()):
+                    nopids_new[aid] = alert
+                    continue
+
+                # Die Persistent-IDs aller referenzierten Warnungen vereinigen
+                pid = set()
+                for ref_aid in refs[aid]:
+                    pid |= set(pids[ref_aid])
+
+                # Sollte es keine refernzierten Warnungen geben, vergeben wir
+                # eine neue Persistent-ID. Es wird bei 1 beginnend eine nicht
+                # belegte ID nach First Fit gesucht.
+                pid = sorted(pid)
+                if len(pid) == 0:
+                    pid = [ freepids.pop(0) ]
+
+                pids[aid] = pid
+                alert.attr_set('pids', pid)
+                rerun = True
+
+            nopids = nopids_new
+
+        if aid in nopids.keys():
+            sys.stderr.write("Warnung '%s' ist Bestandteil eines zirkulären Verweises." % aid)
+            # TODO: einzelne IDs vergeben?
+
+
 
 # Konfiguration einlesen
 with open('mowas.yml') as f:
@@ -197,5 +281,6 @@ with open('mowas.yml') as f:
 CACHE = Cache(CONFIG.get('cache', {}))
 
 valid  = CACHE.purge()
+CACHE.persistent_ids()
 
 CACHE.dump()
