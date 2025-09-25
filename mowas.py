@@ -273,6 +273,21 @@ class Cache:
             # TODO: einzelne IDs vergeben?
 
 
+    def query(self):
+        aid_references = set()
+
+        # Warnungen bestimmen, die durch Aktualisierungen ersetzt wurden
+        for aid in sorted(self.alerts.keys()):
+            alert = self.alerts[aid]
+            if 'references' not in alert.capdata:
+                continue
+            for ref in alert.capdata['references'].split():
+                ref_sender, ref_aid, ref_sent = ref.split(',')
+                aid_references.add(ref_aid)
+
+        return [ alert for aid, alert in self.alerts.items() if aid not in aid_references ]
+
+
 
 # Konfiguration einlesen
 with open('mowas.yml') as f:
@@ -282,5 +297,6 @@ CACHE = Cache(CONFIG.get('cache', {}))
 
 valid  = CACHE.purge()
 CACHE.persistent_ids()
+alerts = CACHE.query()
 
 CACHE.dump()
