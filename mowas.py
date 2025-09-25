@@ -190,6 +190,13 @@ class Cache:
             json.dump(data, f, cls = JSONDateTimeEncoder, indent = 2)
 
 
+    def update(self, alert):
+        if alert.aid in self.alerts:
+            self.alerts[alert.aid].update(alert)
+        else:
+            self.alerts[alert.aid] = alert
+
+
     def purge(self):
         thresh = datetime.datetime.now(datetime.timezone.utc) - self.age
 
@@ -336,6 +343,10 @@ CACHE = Cache(CONFIG.get('cache', {}))
 
 for s in CONFIG['source'].get('bbk_url', []):
     SOURCES.append(SourceBBKUrl(s))
+
+for s in SOURCES:
+    for alert in s.fetch():
+        CACHE.update(alert)
 
 valid  = CACHE.purge()
 CACHE.persistent_ids()
