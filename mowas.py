@@ -1,6 +1,16 @@
 #!/bin/env python3
 
 import datetime
+import json
+import os
+import sys
+
+
+
+class JSONDateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime.date, datetime.time, datetime.datetime)):
+            return obj.isoformat()
 
 
 
@@ -37,6 +47,28 @@ class Alert:
         self.txstate.update(alert.txstate)
 
 
+    @property
+    def cache_ctx(self):
+        ctx = \
+        {
+            'alert':   self.capdata,
+            'attrs':   self.attrs,
+            'txstate': self.txstate,
+        }
+
+        return ctx
+
+
+    def cache_load(self, data):
+        self.attrs   = data['attrs']
+        self.txstate = data['txstate']
+
+        for ttype, tdata in self.txstate.items():
+            for tname, txdata in tdata.items():
+                txdata['first'] = datetime.datetime.fromisoformat(txdata['first'])
+                txdata['last']  = datetime.datetime.fromisoformat(txdata['last'])
+
+
     def attr_set(self, key, value):
         self.attrs[key] = value
 
@@ -65,3 +97,40 @@ class Alert:
         if tname not in self.txstate[ttype]:
             self.txstate[ttype][tname] = { 'first': t }
         self.txstate[ttype][tname]['last'] = t
+
+
+
+class Cache:
+    def __init__(self, config):
+        self.alerts = {}
+
+        if not isinstance(config, dict):
+            sys.stderr.write("Ungültige Cache-Konfiguration: Konfiguration muss ein Dictionary sein.\n")
+            sys.exit(-1)
+
+        if 'path' not in config:
+            sys.stderr.write("Ungültige Cache-Konfiguration: Kein Pfad mit Parameter 'path' angegeben.\n")
+            sys.exit(-1)
+
+        self.path = os.path.join(config['path'])
+
+        if os.path.isfile(self.path):
+            with open(self.path) as f:
+                try:
+                    data = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    sys.stderr.write("Fehler beim Laden des Caches '%s'." % self.path)
+                    return
+        else:
+            return
+
+        for aid, alertdata in data.items():
+            alert = Alert(alertdata['alert'])
+            alert.cache_load(alertdata)
+            self.alerts[aid] = alert
+
+
+    def dump(self):
+        data = { aid: alert.cache_ctx for aid, alert in self.alerts.items() }
+        with open(self.path, 'w') as f:
+            json.dump(data, f, cls = JSONDateTimeEncoder, indent = 2)
