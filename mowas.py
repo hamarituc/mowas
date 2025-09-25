@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 import sys
+import yaml
 
 
 
@@ -134,3 +135,9 @@ class Cache:
         data = { aid: alert.cache_ctx for aid, alert in self.alerts.items() }
         with open(self.path, 'w') as f:
             json.dump(data, f, cls = JSONDateTimeEncoder, indent = 2)
+
+
+
+# Konfiguration einlesen
+with open('mowas.yml') as f:
+    CONFIG = yaml.safe_load(f)
