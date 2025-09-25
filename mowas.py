@@ -197,3 +197,5 @@ with open('mowas.yml') as f:
 CACHE = Cache(CONFIG.get('cache', {}))
 
 valid  = CACHE.purge()
+
+CACHE.dump()
