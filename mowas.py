@@ -141,3 +141,5 @@ class Cache:
 # Konfiguration einlesen
 with open('mowas.yml') as f:
     CONFIG = yaml.safe_load(f)
+
+CACHE = Cache(CONFIG.get('cache', {}))
