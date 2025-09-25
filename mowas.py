@@ -3,6 +3,7 @@
 import datetime
 import json
 import os
+import requests
 import sys
 import yaml
 
@@ -117,6 +118,38 @@ class Alert:
         if tname not in self.txstate[ttype]:
             self.txstate[ttype][tname] = { 'first': t }
         self.txstate[ttype][tname]['last'] = t
+
+
+
+class SourceBBKUrl:
+    def __init__(self, config):
+        if not isinstance(config, dict):
+            sys.stderr.write("Ungültige Konfiguration für BBK-URL-Quelle: Konfiguration muss ein Dictionary sein.\n")
+            sys.exit(-1)
+
+        if 'url' not in config:
+            sys.stderr.write("Ungültige Konfiguration für BBK-URL-Quelle: Kein Pfad mit Parameter 'path' angegeben.\n")
+            sys.exit(-1)
+
+        self.url = config['url']
+
+
+    def fetch(self):
+        r = requests.get(self.url)
+        try:
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            sys.stderr.write("Fehler bei der Abfrage von '%s': %s\n" % ( self.url, e ))
+            return
+
+        try:
+            capdata = r.json()
+        except requests.exceptions.JSONDecodeError as e:
+            sys.stderr.write("Fehler beim Parsen der Rückgabe von '%s': %s\n" % ( self.url, e ))
+            return
+
+        for alertdata in capdata:
+            yield Alert(alertdata)
 
 
 
@@ -293,7 +326,16 @@ class Cache:
 with open('mowas.yml') as f:
     CONFIG = yaml.safe_load(f)
 
+SOURCES = []
+
+if 'source' not in CONFIG or not isinstance(CONFIG['source'], dict):
+    sys.stderr.write("Ungültige Konfiguration: Quellenangabe 'source' muss ein Dictionary sein.")
+    sys.exit(-1)
+
 CACHE = Cache(CONFIG.get('cache', {}))
+
+for s in CONFIG['source'].get('bbk_url', []):
+    SOURCES.append(SourceBBKUrl(s))
 
 valid  = CACHE.purge()
 CACHE.persistent_ids()
