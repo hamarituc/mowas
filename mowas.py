@@ -382,6 +382,82 @@ class Cache:
 
 
 
+class Filter:
+    # Übergeordnete Bereiche bestimmen
+    def _area_superset(self, geocode : str) -> set:
+        areas = []
+        areas.append("000000000000")
+        areas.append(geocode[0:2] + "0000000000")
+        areas.append(geocode[0:3] + "000000000")
+        areas.append(geocode[0:5] + "0000000")
+        areas.append(geocode[0:9] + "000")
+        areas.append(geocode)
+
+        return set(areas)
+
+
+    # Redundante Bereiche filtern
+    def _area_filter_redundant(self, geocodes : [ list, set ]) -> set:
+        return { g for g in geocodes if not (self._area_superset(g) - { g }) & set(geocodes) }
+
+
+    def __init__(self, config):
+        # Gebietsschlüssel auf Plausibilität prüfen.
+        geocodes = []
+        for i, r in enumerate(config.get_list('geocodes', [])):
+            if not isinstance(r, str):
+                raise ConfigException("Ungültiger Gebietsschlüssel '%s': String erwartet." % r)
+
+            if len(set(r) - set("0123456789")) > 0:
+                raise ConfigException("Ungültiger Gebietsschlüssel '%s': Nur Ziffern erlaubt." % r)
+
+            if len(r) > 12:
+                sys.stderr.write("Ungültiger Gebietsschlüssel '%s': Zu lang. Kürze auf 12 Stellen.\n" % r)
+                geocodes.append(r[0:12])
+            elif len(r) in [ 2, 3, 5, 9, 12 ]:
+                # Zu Kurze Regionalschlüssel ggf. erweitern
+                geocodes.append(r.ljust(12, "0"))
+            else:
+                raise ConfigException("Ungültiger Gebietsschlüssel '%s': Zu kurz." % r)
+
+        # Gebietsschlüssel verwerfen, die bereits durch übergeordnete
+        # Gebietsschlüssel erfasst sind.
+        self.geocodes = self._area_filter_redundant(geocodes)
+
+        # Alle übergeordneten Gebiete einbeziehen.
+        self.geocodes_super = set()
+        for r in self.geocodes:
+            self.geocodes_super |= self._area_superset(r)
+
+        # Maximales Altert eine Warnung bei Erstalarmierung
+        self.max_age = config.get_duration('max_age', '4h')
+
+
+    def match_age(self, alert, ttype, tname, t):
+        tfirst, tlast = alert.tx_status(ttype, tname)
+
+        if tfirst is None and alert.capdata['sent'] + self.max_age <= t:
+            return False
+
+        return True
+
+
+    def match_geo(self, geocode):
+        # Eine Nachricht wird übernommen, wenn sie unterhalb der von uns
+        # spezifizierten Gebiete liegt oder für eines der uns
+        # übergeordneten Gebiete kodiert ist.
+        geocodes = []
+        for g in geocode:
+            gcode = g['value']
+            geocode_super = self._area_superset(gcode)
+            if gcode in self.geocodes_super or \
+               len(geocode_super & self.geocodes) > 0:
+                geocodes.append(g)
+
+        return geocodes
+
+
+
 # Konfiguration einlesen
 with open('mowas.yml') as f:
     CONFIG = Config(yaml.safe_load(f), "Ungültiges Konfiguration")
