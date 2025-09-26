@@ -1,6 +1,13 @@
 #!/bin/env python3
 
+from aioax25.aprs.datetime import DHMUTCTimestamp
 from aioax25.aprs.frame import APRSFrame
+from aioax25.aprs.position import APRSLatitude
+from aioax25.aprs.position import APRSLongitude
+from aioax25.aprs.position import APRSUncompressedCoordinates
+from aioax25.aprs.position import APRSCompressedLatitude
+from aioax25.aprs.position import APRSCompressedLongitude
+from aioax25.aprs.position import APRSCompressedCoordinates
 from aioax25.aprs.symbol import APRSSymbol
 from aioax25.frame import AX25Address
 import copy
@@ -759,6 +766,93 @@ class TargetAprs(Target):
         return [ frame ]
 
 
+    def _get_beacon(self, pids, cancel, infoidx, symbol, pos, time, comment):
+        multiarea = len(pos) > 1
+
+        calls = []
+        for pid in pids:
+            for pidx, p in enumerate(pos):
+                calls.append(( pid, p, chr(min(pidx, 26) + ord('A')) ))
+
+            # Wir benutzen nur die erste Persistent-ID um die Airtime gering zu
+            # halten. Ggf. können wir überlegen, ob wir die Meldung für alle
+            # Persistent-IDs übertragen oder alle APRS-Objekte bis auf das
+            # erste caceln.
+            break
+
+        frames = []
+        for pid, p, pidx in calls:
+            call = self.beacon_prefix
+            call += '%d' % pid
+            if multiarea:
+                call += pidx
+
+            if infoidx is not None:
+                if not multiarea:
+                    call += '-'
+                call += '%d' % infoidx
+
+            if len(call) > 9:
+                newcall = call[:9]
+                sys.stderr.write("APRS-Objektbezeichnung '%s' zu lang. Kürze auf '%s'.\n" % ( call, newcall ))
+                call = newcall
+
+            lat = (p.GetY() +  90.0) % 180 -  90.0
+            lon = (p.GetX() + 180.0) % 360 - 180.0
+
+            if self.compress_position:
+                coord = APRSCompressedCoordinates(
+                    lat = APRSCompressedLatitude(lat),
+                    lng = APRSCompressedLongitude(lon),
+                    symbol = symbol
+                )
+            else:
+                coord = APRSUncompressedCoordinates(
+                    lat = APRSLatitude(lat),
+                    lng = APRSLongitude(lon),
+                    symbol = symbol
+                )
+
+            if time is not None:
+                time = DHMUTCTimestamp(
+                    day = time.day,
+                    hour = time.hour,
+                    minute = time.minute
+                )
+
+            packet = ''
+            if time is None:
+                packet += ')'
+                packet += call.ljust(3)
+                packet += '_' if cancel else '!'
+            else:
+                packet += ';'
+                packet += call.ljust(9)
+                packet += '_' if cancel else '*'
+                packet += str(time)
+
+            packet += str(coord)
+
+            if comment is None:
+                if cancel:
+                    comment = "Unspezifische MoWaS-Warnung"
+                else:
+                    comment = "Unspezifische MoWaS-Entwarnung"
+
+            packet += comment
+
+            frames.append(
+                APRSFrame(
+                    self.dstcall,
+                    self.mycall,
+                    packet.encode(),
+                    repeaters = [ AX25Address(addr) for addr in self.digipath ]
+                )
+            )
+
+        return frames
+
+
     def alert(self, alerts):
         t = datetime.datetime.now(datetime.timezone.utc)
 
@@ -782,6 +876,7 @@ class TargetAprs(Target):
                 comment = self._get_comment(info)
 
                 frames.extend(self._get_bulletin(pos, comment))
+                frames.extend(self._get_beacon(pids, cancel, infoidx if multiinfo else None, symbol, pos, time, comment))
 
 
 
