@@ -1,6 +1,8 @@
 #!/bin/env python3
 
+from aioax25.aprs.frame import APRSFrame
 from aioax25.aprs.symbol import APRSSymbol
+from aioax25.frame import AX25Address
 import copy
 import datetime
 import json
@@ -732,6 +734,31 @@ class TargetAprs(Target):
         return comment
 
 
+    def _get_bulletin(self, pos, comment):
+        if self.bulletin_mode == 'never':
+            # Generell auf Bulletins verzichten.
+            return []
+        elif self.bulletin_mode == 'fallback':
+            # Bulletins nur übertragen, wenn keine Positionen vorhanden sind.
+            if len(pos) > 0:
+                return []
+
+        # Ohne Meldungstext gibt es nichts zu warnen.
+        if comment is None:
+            return []
+
+        packet = (':BLN%s:' % self.bulletin_id) + comment.replace('|', '').replace('~', '')
+
+        frame = APRSFrame(
+            self.dstcall,
+            self.mycall,
+            packet.encode(),
+            repeaters = [ AX25Address(addr) for addr in self.digipath ]
+        )
+
+        return [ frame ]
+
+
     def alert(self, alerts):
         t = datetime.datetime.now(datetime.timezone.utc)
 
@@ -753,6 +780,8 @@ class TargetAprs(Target):
                 pos = self._get_pos(info)
                 time = self._get_time(info, capdata, t)
                 comment = self._get_comment(info)
+
+                frames.extend(self._get_bulletin(pos, comment))
 
 
 
