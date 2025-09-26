@@ -1,5 +1,6 @@
 #!/bin/env python3
 
+import copy
 import datetime
 import json
 import os
@@ -455,6 +456,69 @@ class Filter:
                 geocodes.append(g)
 
         return geocodes
+
+
+
+class Target:
+    def __init__(self, tname, config):
+        self.tname = tname
+        self.filter = Filter(config.get_subtree('filter', "Ungültige Filter-Konfiguration", True))
+
+
+    def query(self, alerts, t):
+        for alert in alerts:
+            # Warnungen, die noch nie übertragen wurden, aber zu alt sind,
+            # verwerfen wir. Sie kommen ggf. dadurch zu Stande, dass der Cache
+            # leer war. Wir vermeiden es somit, veraltete Warnungen erneut zu
+            # auszulösen.
+            if not self.filter.match_age(alert, self.ttype, self.tname, t):
+                continue
+
+            capdata = copy.deepcopy(alert.capdata)
+
+            if 'info' not in capdata:
+                continue
+
+            infos = []
+            for info in capdata['info']:
+                # Abgelaufene Meldungen verwerfen
+                if 'expires' in info and info['expires'] < t:
+                    continue
+
+                # Meldungen verwerfen, die noch nicht aktiv sind
+                if 'onset' in info and info['onset'] >= t:
+                    continue
+
+                if 'area' not in info:
+                    continue
+
+                areas = []
+                for area in info['area']:
+                    # Ohne Gebietsschlüssel können wir die Warnung nicht
+                    # verarbeiten. Ggf. könnten wir bei der Veröffentlichung
+                    # von Polygonen auf geometrische Überschneidungen mit den
+                    # von uns spezifierten Warngebieten prüfen.
+                    if 'geocode' not in area:
+                        continue
+
+                    area['geocode'] = self.filter.match_geo(area['geocode'])
+                    if len(area['geocode']) == 0:
+                        continue
+
+                    areas.append(area)
+
+                if len(areas) == 0:
+                    continue
+
+                info['area'] = areas
+                infos.append(info)
+
+            if len(infos) == 0:
+                continue
+
+            capdata['info'] = infos
+
+            yield alert, capdata
 
 
 
