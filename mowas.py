@@ -3,6 +3,7 @@
 import datetime
 import json
 import os
+import re
 import requests
 import sys
 import yaml
@@ -16,10 +17,14 @@ class JSONDateTimeEncoder(json.JSONEncoder):
 
 
 
-def parse_time(s):
+class ConfigException(Exception):
+    pass
+
+
+def parse_duration(s):
     match = re.fullmatch('([0-9]+)([mhdw]?)', s)
     if match is None:
-        raise ValueError("Ungültiges Zeitintervall '%s'" % s)
+        raise ConfigException("Ungültiges Zeitintervall '%s'" % s)
 
     t = datetime.timedelta(minutes = int(match[1]))
 
@@ -32,6 +37,70 @@ def parse_time(s):
         t *= 60 * 24 * 7
 
     return t
+
+
+class Config:
+    def __init__(self, tree, errmsg):
+        if not isinstance(tree, dict):
+            raise ConfigException("%s: Dictionary erwartet." % errmsg)
+        self.tree = tree
+
+
+    def get_subtree(self, key, errmsg, optional = False):
+        subtree = self.tree.get(key, {} if optional else None)
+        return Config(subtree, "%s: Dictionary erwartet." % errmsg)
+
+
+    def _get_value(self, key, default = None):
+        if default is None and key not in self.tree:
+            raise ConfigException("Attribut '%s' ist erfordertlich.\n" % key)
+        return self.tree.get(key, default)
+
+
+    def get_bool(self, key, default = None):
+        value = self._get_value(key, default)
+        if value not in [ True, False ]:
+            raise ConfigException("Ungültiges Attribut '%s': Boolean erwartet." % key)
+        return value
+
+
+    def get_int(self, key, default = None):
+        value = self._get_value(key, default)
+        if not isinstance(value, int):
+            raise ConfigException("Ungültiges Attribut '%s': Ganzzahl erwartet." % key)
+        return value
+
+
+    def get_str(self, key, default = None):
+        value = self._get_value(key, default)
+        if not isinstance(value, str):
+            raise ConfigException("Ungültiges Attribut '%s': String erwartet." % key)
+        return value
+
+
+    def get_duration(self, key, default = None):
+        value = self.get_str(key, default)
+
+        try:
+            value = parse_duration(value)
+        except ConfigException as e:
+            raise ConfigException("Ungültiges Attribut '%s': %s" % ( key, e.message ))
+
+        return value
+
+
+    def get_list(self, key, default = None):
+        value = self._get_value(key, default)
+        if not isinstance(value, list):
+            raise ConfigException("Ungültiges Attribut '%s': Liste erwartet." % key)
+        return value
+
+
+    def get_dict(self, key, default = None):
+        value = self._get_value(key, default)
+        if not isinstance(value, dict):
+            raise ConfigException("Ungültiges Attribut '%s': Dictionary erwartet." % key)
+        return value
 
 
 
@@ -123,15 +192,7 @@ class Alert:
 
 class SourceBBKUrl:
     def __init__(self, config):
-        if not isinstance(config, dict):
-            sys.stderr.write("Ungültige Konfiguration für BBK-URL-Quelle: Konfiguration muss ein Dictionary sein.\n")
-            sys.exit(-1)
-
-        if 'url' not in config:
-            sys.stderr.write("Ungültige Konfiguration für BBK-URL-Quelle: Kein Pfad mit Parameter 'path' angegeben.\n")
-            sys.exit(-1)
-
-        self.url = config['url']
+        self.url = config.get_str('url')
 
 
     def fetch(self):
@@ -155,18 +216,10 @@ class SourceBBKUrl:
 
 class Cache:
     def __init__(self, config):
+        self.path = config.get_str('path')
+        self.age  = config.get_duration('purge', '31d')
+
         self.alerts = {}
-
-        if not isinstance(config, dict):
-            sys.stderr.write("Ungültige Cache-Konfiguration: Konfiguration muss ein Dictionary sein.\n")
-            sys.exit(-1)
-
-        if 'path' not in config:
-            sys.stderr.write("Ungültige Cache-Konfiguration: Kein Pfad mit Parameter 'path' angegeben.\n")
-            sys.exit(-1)
-
-        self.path = os.path.join(config['path'])
-        self.age  = parse_time(config.get('purge', '31d'))
 
         if os.path.isfile(self.path):
             with open(self.path) as f:
@@ -331,18 +384,16 @@ class Cache:
 
 # Konfiguration einlesen
 with open('mowas.yml') as f:
-    CONFIG = yaml.safe_load(f)
+    CONFIG = Config(yaml.safe_load(f), "Ungültiges Konfiguration")
 
+CACHE = Cache(CONFIG.get_subtree('cache', "Ungültige Cache-Konfiguration"))
+
+
+# Quellen initialisieren
+SOURCE_CONFIG = CONFIG.get_subtree('source', "Ungültige Quellen-Konfiguration")
 SOURCES = []
-
-if 'source' not in CONFIG or not isinstance(CONFIG['source'], dict):
-    sys.stderr.write("Ungültige Konfiguration: Quellenangabe 'source' muss ein Dictionary sein.")
-    sys.exit(-1)
-
-CACHE = Cache(CONFIG.get('cache', {}))
-
-for s in CONFIG['source'].get('bbk_url', []):
-    SOURCES.append(SourceBBKUrl(s))
+for s in SOURCE_CONFIG.get_list('bbk_url', []):
+    SOURCES.append(SourceBBKUrl(Config(s, "Ungültige Konfiguration für BBK-URL-Quelle")))
 
 for s in SOURCES:
     for alert in s.fetch():
