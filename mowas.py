@@ -669,6 +669,41 @@ class TargetAprs(Target):
         return pos
 
 
+    #
+    # APRS-Baken können mit einem fixen Zeitpunkt verknüpft werden.
+    #
+    def _get_time(self, info, capdata, t):
+        # Generell auf Zeitangaben verzichten
+        if self.no_time:
+            return None
+
+        # Es gibt mehrere Zeitstempel, die für das Ereigniss kodiert sein
+        # können. Die Zeitstempel müssen jedoch nicht angegeben sein. Der
+        # zutreffendeste angegebene Zeitstempel gewinnt.
+        if 'onset' in info:
+            # Veröffentlicher Anfangszeitpunkt des Ereignisses
+            time = info['onset']
+        elif 'effective' in info:
+            # Veröffentlichungszeitpunkt der Warnmeldung
+            time = info['effective']
+        elif 'sent' in capdata:
+            # Alarmierungszeitpunkt
+            time = capdata['sent']
+        else:
+            return None
+
+        # Bei lang zurückliegenden Meldungen geben wir keinen Zeitpunkt an,
+        # da wir bei APRS nur den Monatstag übermitteln können. Um
+        # Eindeutigkeit sicherzustellen, werden zukünftige Meldungen eine Woche
+        # im Voraus und vergangene Meldungen 3 Wochen im Nachgang mit einer
+        # Zeitangabe versehen.
+        if t - time >= datetime.timedelta(days = 21) or \
+           t - time <= datetime.timedelta(days = -7):
+            return None
+
+        return time
+
+
     def alert(self, alerts):
         t = datetime.datetime.now(datetime.timezone.utc)
 
@@ -688,6 +723,7 @@ class TargetAprs(Target):
             for infoidx, info in enumerate(capdata['info']):
                 symbol = APRSSymbol('\\', '\'')
                 pos = self._get_pos(info)
+                time = self._get_time(info, capdata, t)
 
 
 
