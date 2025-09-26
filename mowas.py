@@ -459,6 +459,49 @@ class Filter:
 
 
 
+class Schedule:
+    def __init__(self, config):
+        sched = []
+        for thresh, interval in config.tree.items():
+            try:
+                thresh = parse_duration(thresh)
+            except ConfigException:
+                raise ConfigException("Ungültiger Wiederholungsrhythmus: Schwellwert '%s' ist keine gültige Zeitdauer." % thresh)
+
+            try:
+                interval = parse_duration(interval)
+            except ConfigException:
+                raise ConfigException("Ungültiger Wiederholungsrhythmus: Intervall '%s' ist keine gültige Zeitdauer." % interval)
+
+            sched.append(( thresh, interval ))
+        sched.sort()
+
+        # Wir bestimmen alle Wiederholungszeitpunkt ab t = 0.
+        self.sched = [ datetime.timedelta(seconds = 0) ]
+        for thresh, interval in sched:
+            n = (thresh - self.sched[-1]) // interval
+            for i in range(n):
+                self.sched.append(self.sched[-1] + interval)
+
+
+    def tx_required(self, alert, ttype, tname, t):
+        first, last = alert.tx_status(ttype, tname)
+        if first is None or last is None:
+            return True
+
+        diff = last - first
+
+        # Alle vorausliegenden Übertragungszeitpunkt berechnen
+        diffs = [ d for d in self.sched if d > diff ]
+
+        # Alle Übertragungen wurden abgeschlossen
+        if len(diffs) == 0:
+            return False
+
+        return first + diffs[0] <= t
+
+
+
 class Target:
     def __init__(self, tname, config):
         self.tname = tname
