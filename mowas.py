@@ -1,5 +1,6 @@
 #!/bin/env python3
 
+from aioax25.aprs.symbol import APRSSymbol
 import copy
 import datetime
 import json
@@ -562,6 +563,58 @@ class Target:
             capdata['info'] = infos
 
             yield alert, capdata
+
+
+
+class TargetAprs(Target):
+    def __init__(self, tname, config):
+        super().__init__(tname, config)
+
+        self.sched             = Schedule(config.get_subtree('schedule', "Ungültiger Widerholungsrhythmus"))
+        self.dstcall           = config.get_str('dstcall', 'APMOWA')
+        self.mycall            = config.get_str('mycall')
+        self.digipath          = config.get_list('digipath', [ 'WIDE1-1' ])
+        self.beacon_prefix     = config.get_str('beacon_prefix', 'MOWA')
+        self.max_areas         = config.get_int('max_areas', 0)
+        self.no_position       = config.get_bool('no_position', False)
+        self.no_time           = config.get_bool('no_time', False)
+        self.compress_position = config.get_bool('compress_position', False)
+        self.bulletin_id       = config.get_str('bulletin_id', '0MOWAS')[0:6].ljust(6, ' ')
+        self.bulletin_mode     = config.get_str('bulletin_mode', 'fallback').lower()
+
+        if self.bulletin_mode not in [ 'never', 'fallback', 'always' ]:
+            sys.stderr.write("Senke '%s/%s': Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück.\n" % ( self.ttype, self.tname, self.bulletin_mode ))
+            self.bulletin_mode = 'fallback'
+
+
+    def query(self, alerts, t):
+        for alert, capdata in super().query(alerts, t):
+            # Nachrichten nur wiederholen, wenn es das Wiederholungsintervall
+            # verlangt.
+            if not self.sched.tx_required(alert, self.ttype, self.tname, t):
+                continue
+
+            yield alert, capdata
+
+
+    def alert(self, alerts):
+        t = datetime.datetime.now(datetime.timezone.utc)
+
+        frames = []
+        for alert, capdata in self.query(alerts, t):
+            pids = alert.attr_get('pids')
+            multiinfo = len(capdata['info']) > 1
+
+            # Feststellen, ob es eine Entwarnung ist.
+            if 'msgType' in capdata:
+                cancel = capdata['msgType'].lower() == 'cancel'
+            else:
+                cancel = False
+
+            # Wir betrachten alle Ereignisse einer Warnung als separate
+            # APRS-Objekte.
+            for infoidx, info in enumerate(capdata['info']):
+                symbol = APRSSymbol('\\', '\'')
 
 
 
