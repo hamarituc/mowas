@@ -5,6 +5,7 @@ import copy
 import datetime
 import json
 import os
+from osgeo import ogr
 import re
 import requests
 import sys
@@ -597,6 +598,77 @@ class TargetAprs(Target):
             yield alert, capdata
 
 
+    #
+    # APRS kann im Endeffekt nur Punktkoordinaten behandeln. Es besteht eine
+    # Möglichkeit eine Ellipse um diesen Punkt herum zu definieren. Diese
+    # Kodierung unterstützt unsere APRS-Bibliothek aber nicht, weswegen wir
+    # darauf verzichten.
+    #
+    # Die Gebietsdaten liegen jedoch meist als Flächen vor, entweder direkt
+    # im Warndatensatz oder anhand amtlicher Polygone für jeden
+    # Gebietsschlüssel.
+    #
+    # In einem ersten Schritt wird jedem Warnereignis eine Reihe von Polygonen
+    # zugeordnet. Bezieht sich ein Ereignisse auf eine Menge mehrerer Gebiete,
+    # werden diese bis zu einem konfigurierbaren Schwellwert getrennt
+    # behandelt. Wird die Anzahl Gebiete zu groß, werden diese zu einem
+    # Gesamtgebiet vereinigt, um das APRS-Netz nicht mit zu vielen
+    # Positionsmeldungen zu überlasten.
+    #
+    # In einem zweiten Schritt werden die Schwerpunkte zu diesen
+    # Gebietspolygonen bestimmt. Diese spiegeln dann die APRS-Positionen
+    # wieder.
+    #
+    # Es kann auch passieren, dass keine Position bestimmbar ist. Dies ist
+    # jedoch kein Fehler, da wir dann in der Lage sind per APRS-Bulletin zu
+    # warnen.
+    #
+    def _get_pos(self, info):
+        if self.no_position:
+            return []
+
+        # Wir behandeln jedes Gebiet einzeln.
+        for area in info['area']:
+            polys = []
+
+            # Polygon in eine geometrische Datenstruktur überführen.
+            # Selbst ein Gebiet kann aus mehreren Polygonen bestehen. Dies ist
+            # z.B. bei Flächen mit Löchern der Fall. Wir müssen uns aber nicht
+            # um diese Sonderfälle kümmern. Die `ogr`-Bibliothek berücksichtigt
+            # das bereits alles.
+            if 'polygon' in area:
+                polygon = ogr.Geometry(ogr.wkbPolygon)
+                for ringstr in area['polygon']:
+                    ring = ogr.Geometry(ogr.wkbLinearRing)
+                    for coords in ringstr.split():
+                        x, y = coords.split(',')
+                        ring.AddPoint(float(x), float(y))
+
+                    ring.FlattenTo2D()
+                    polygon.AddGeometry(ring)
+                polys.append(polygon)
+
+        # Zu viele Einzelflächen bei Bedarf zusammenführen
+        if self.max_areas > 0 and len(polys) > self.max_areas:
+            multipolygon = ogr.Geometry(ogr.wkbMultiPolygon)
+            for poly in polys:
+                multipolygon.AddGeometry(poly)
+            polys = [ multipolygon ]
+
+        # Polygone in Koordinaten auflösen
+        pos = []
+        for poly in polys:
+            p = poly.Centroid()
+
+            # ungültige Geometrien verwerfen
+            if not p.IsValid() or p.IsEmpty():
+                continue
+
+            pos.append(p)
+
+        return pos
+
+
     def alert(self, alerts):
         t = datetime.datetime.now(datetime.timezone.utc)
 
@@ -615,6 +687,7 @@ class TargetAprs(Target):
             # APRS-Objekte.
             for infoidx, info in enumerate(capdata['info']):
                 symbol = APRSSymbol('\\', '\'')
+                pos = self._get_pos(info)
 
 
 
