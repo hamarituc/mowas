@@ -880,6 +880,16 @@ class TargetAprs(Target):
 
 
 
+class TargetAprsKissSerial(TargetAprs):
+    ttype = 'aprs_kiss_serial'
+
+
+
+class TargetAprsKissTcp(TargetAprs):
+    ttype = 'aprs_kiss_tcp'
+
+
+
 # Konfiguration einlesen
 with open('mowas.yml') as f:
     CONFIG = Config(yaml.safe_load(f), "Ungültiges Konfiguration")
@@ -893,6 +903,21 @@ SOURCES = []
 for s in SOURCE_CONFIG.get_list('bbk_url', []):
     SOURCES.append(SourceBBKUrl(Config(s, "Ungültige Konfiguration für BBK-URL-Quelle")))
 
+# Senken initialisieren
+TARGET_CLASSES = \
+[
+    ( 'aprs_kiss_serial', TargetAprsKissSerial ),
+    ( 'aprs_kiss_tcp',    TargetAprsKissTcp    ),
+]
+
+TARGET_CONFIG = CONFIG.get_subtree('target', "Ungültige Senken-Konfiguration")
+TARGETS = []
+for ttype, tclass in TARGET_CLASSES:
+    targets = TARGET_CONFIG.get_dict(ttype, {})
+    for tname, t in targets.items():
+        TARGETS.append(tclass(tname, Config(t, "Ungültige Konfiguration für Senke '%s/%s'" % ( ttype, tname ))))
+
+
 for s in SOURCES:
     for alert in s.fetch():
         CACHE.update(alert)
@@ -900,5 +925,8 @@ for s in SOURCES:
 valid  = CACHE.purge()
 CACHE.persistent_ids()
 alerts = CACHE.query()
+
+for t in TARGETS:
+    t.alert(alerts)
 
 CACHE.dump()
