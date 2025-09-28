@@ -15,6 +15,7 @@ import datetime
 import json
 import os
 from osgeo import ogr
+import pytz
 import re
 import requests
 import sys
@@ -713,7 +714,7 @@ class TargetAprs(Target):
            t - time <= datetime.timedelta(days = -7):
             return None
 
-        return time
+        return time.astimezone(pytz.utc)
 
 
     def _get_comment(self, info):
