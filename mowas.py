@@ -19,6 +19,7 @@ import pytz
 import re
 import requests
 import serial
+import socket
 import sys
 import yaml
 
@@ -932,6 +933,26 @@ class TargetAprsKissSerial(TargetAprsKiss):
 
 class TargetAprsKissTcp(TargetAprsKiss):
     ttype = 'aprs_kiss_tcp'
+
+
+    def __init__(self, tname, config):
+        super().__init__(tname, config)
+
+        config_remote = config.get_subtree('remote', "Ungültige Verbindungskonfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
+
+        self.remote_host = config_remote.get_str('host')
+        self.remote_port = config_remote.get_int('port')
+
+
+    def send(self, frames):
+        kissdata = super().send(frames)
+
+        sock = socket.socket()
+        sock.connect(( self.remote_host, self.remote_port ))
+        sock.shutdown(socket.SHUT_RD)
+        sock.send(kissdata)
+        sock.shutdown(socket.SHUT_WR)
+        sock.close()
 
 
 
