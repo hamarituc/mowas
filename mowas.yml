@@ -18,9 +18,10 @@ target:
         10m: '1m'
         60m: '5m'
         1d: '10m'
-      mycall: 'DB0CSD'
-      digipath:
-        - 'WIDE1-1'
-        - 'WIDE2-2'
-      beacon_prefix: 'MW'
-      bulletin_id: '0MOWAS'
+      aprs:
+        mycall: 'DB0CSD'
+        digipath:
+          - 'WIDE1-1'
+          - 'WIDE2-2'
+        beacon_prefix: 'MW'
+        bulletin_id: '0MOWAS'

@@ -581,16 +581,19 @@ class TargetAprs(Target):
         super().__init__(tname, config)
 
         self.sched = Schedule(config.get_subtree('schedule', "Ungültiger Widerholungsrhythmus für Senke '%s/%s'" % ( self.ttype, self.tname )))
-        self.dstcall           = config.get_str('dstcall', 'APMOWA')
-        self.mycall            = config.get_str('mycall')
-        self.digipath          = config.get_list('digipath', [ 'WIDE1-1' ])
-        self.beacon_prefix     = config.get_str('beacon_prefix', 'MOWA')
-        self.max_areas         = config.get_int('max_areas', 0)
-        self.no_position       = config.get_bool('no_position', False)
-        self.no_time           = config.get_bool('no_time', False)
-        self.compress_position = config.get_bool('compress_position', False)
-        self.bulletin_id       = config.get_str('bulletin_id', '0MOWAS')[0:6].ljust(6, ' ')
-        self.bulletin_mode     = config.get_str('bulletin_mode', 'fallback').lower()
+
+        config_aprs = config.get_subtree('aprs', "Ungültige APRS-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
+
+        self.dstcall           = config_aprs.get_str('dstcall', 'APMOWA')
+        self.mycall            = config_aprs.get_str('mycall')
+        self.digipath          = config_aprs.get_list('digipath', [ 'WIDE1-1' ])
+        self.beacon_prefix     = config_aprs.get_str('beacon_prefix', 'MOWA')
+        self.max_areas         = config_aprs.get_int('max_areas', 0)
+        self.no_position       = config_aprs.get_bool('no_position', False)
+        self.no_time           = config_aprs.get_bool('no_time', False)
+        self.compress_position = config_aprs.get_bool('compress_position', False)
+        self.bulletin_id       = config_aprs.get_str('bulletin_id', '0MOWAS')[0:6].ljust(6, ' ')
+        self.bulletin_mode     = config_aprs.get_str('bulletin_mode', 'fallback').lower()
 
         if self.bulletin_mode not in [ 'never', 'fallback', 'always' ]:
             sys.stderr.write("Senke '%s/%s': Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück.\n" % ( self.ttype, self.tname, self.bulletin_mode ))
