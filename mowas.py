@@ -516,7 +516,7 @@ class Schedule:
 class Target:
     def __init__(self, tname, config):
         self.tname = tname
-        self.filter = Filter(config.get_subtree('filter', "Ungültige Filter-Konfiguration", True))
+        self.filter = Filter(config.get_subtree('filter', "Ungültige Filter-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), True))
 
 
     def query(self, alerts, t):
@@ -580,7 +580,7 @@ class TargetAprs(Target):
     def __init__(self, tname, config):
         super().__init__(tname, config)
 
-        self.sched             = Schedule(config.get_subtree('schedule', "Ungültiger Widerholungsrhythmus"))
+        self.sched = Schedule(config.get_subtree('schedule', "Ungültiger Widerholungsrhythmus für Senke '%s/%s'" % ( self.ttype, self.tname )))
         self.dstcall           = config.get_str('dstcall', 'APMOWA')
         self.mycall            = config.get_str('mycall')
         self.digipath          = config.get_list('digipath', [ 'WIDE1-1' ])
