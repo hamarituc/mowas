@@ -18,6 +18,7 @@ from osgeo import ogr
 import pytz
 import re
 import requests
+import serial
 import sys
 import yaml
 
@@ -910,6 +911,22 @@ class TargetAprsKiss(TargetAprs):
 
 class TargetAprsKissSerial(TargetAprsKiss):
     ttype = 'aprs_kiss_serial'
+
+
+    def __init__(self, tname, config):
+        super().__init__(tname, config)
+
+        config_serial = config.get_subtree('serial', "Ungültige Schnittstellenkonfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
+
+        self.serial_device = config_serial.get_str('device')
+        self.serial_baud   = config_serial.get_int('baud', 115200)
+
+
+    def send(self, frames):
+        kissdata = super().send(frames)
+
+        with serial.Serial(self.serial_device, self.serial_baud) as kissconn:
+            kissconn.write(kissdata)
 
 
 

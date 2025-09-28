@@ -25,6 +25,9 @@ target:
           - 'WIDE2-2'
         beacon_prefix: 'MW'
         bulletin_id: '0MOWAS'
+      serial:
+        device: '/dev/ttyUSB0'
+        baud: 115200
       kiss:
         ports:
           - 0
