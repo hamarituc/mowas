@@ -60,7 +60,7 @@ class Config:
 
     def get_subtree(self, key, errmsg, optional = False):
         subtree = self.tree.get(key, {} if optional else None)
-        return Config(subtree, "%s: Dictionary erwartet." % errmsg)
+        return Config(subtree, errmsg)
 
 
     def _get_value(self, key, default = None):
