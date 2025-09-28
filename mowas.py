@@ -884,6 +884,12 @@ class TargetAprs(Target):
                 frames.extend(self._get_bulletin(pos, comment))
                 frames.extend(self._get_beacon(pids, cancel, infoidx if multiinfo else None, symbol, pos, time, comment))
 
+        self.send(frames)
+
+
+    def send(self, alerts):
+        pass
+
 
 
 class TargetAprsKiss(TargetAprs):
