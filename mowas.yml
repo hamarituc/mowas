@@ -25,3 +25,6 @@ target:
           - 'WIDE2-2'
         beacon_prefix: 'MW'
         bulletin_id: '0MOWAS'
+      kiss:
+        ports:
+          - 0

@@ -884,12 +884,36 @@ class TargetAprs(Target):
 
 
 
-class TargetAprsKissSerial(TargetAprs):
+class TargetAprsKiss(TargetAprs):
+    def __init__(self, tname, config):
+        super().__init__(tname, config)
+
+        config_kiss = config.get_subtree('kiss', "Ungültige KISS-konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
+
+        self.kiss_ports = config_kiss.get_list('ports')
+        self.kiss_ports = [ p for p in self.kiss_ports if isinstance(p, int) and p < 16 ]
+
+
+    def send(self, frames):
+        kissdata = bytes()
+
+        for p in self.kiss_ports:
+            for f in frames:
+                kissdata += b'\xc0'
+                kissdata += bytes([ 16 * (p % 16) ])
+                kissdata += bytes(f).replace(b'\xdb', b'\xdb\xdd').replace(b'\xc0', b'\xdb\xdc')
+                kissdata += b'\xc0'
+
+        return kissdata
+
+
+
+class TargetAprsKissSerial(TargetAprsKiss):
     ttype = 'aprs_kiss_serial'
 
 
 
-class TargetAprsKissTcp(TargetAprs):
+class TargetAprsKissTcp(TargetAprsKiss):
     ttype = 'aprs_kiss_tcp'
 
 
