@@ -14,7 +14,9 @@ import copy
 import datetime
 import json
 import os
+from osgeo import gdal
 from osgeo import ogr
+from osgeo import osr
 import pytz
 import re
 import requests
@@ -116,6 +118,92 @@ class Config:
         if not isinstance(value, dict):
             raise ConfigException("Ungültiges Attribut '%s': Dictionary erwartet." % key)
         return value
+
+
+
+class Geodata:
+    def __init__(self, config):
+        self.ars = {}
+
+        self.WGS84 = osr.SpatialReference()
+        self.WGS84.ImportFromEPSG(4326)
+
+        self._load_vg(config.get_str('vg5000', ''), [ 'vg5000_sta', 'vg5000_lan', 'vg5000_rbz', 'vg5000_krs', 'vg5000_vwg', 'vg5000_gem' ])
+        self._load_vg(config.get_str('vg2500', ''), [ 'vg2500_sta', 'vg2500_lan', 'vg2500_rbz', 'vg2500_krs' ])
+        self._load_vg(config.get_str('vg1000', ''), [ 'vg1000_sta', 'vg1000_lan', 'vg1000_rbz', 'vg1000_krs' ])
+        self._load_vg(config.get_str( 'vg250', ''), [  'vg250_sta',  'vg250_lan',  'vg250_rbz',  'vg250_krs',  'vg250_vwg',  'vg250_gem' ])
+
+
+    def _load_vg(self, path, layers):
+        if path is None or len(path) == 0:
+            return
+
+        sys.stderr.write("Lade '%s'.\n" % path)
+
+        ds = gdal.OpenEx(path, gdal.OF_READONLY)
+        if ds is None:
+            sys.stderr.write("Kann '%s' nicht öffnen.\n" % path)
+            return
+
+        for lname in layers:
+            l = ds.GetLayer(lname)
+
+            if l is None:
+                sys.stderr.write("Ebene '%s' in '%s' nicht vorhanden.\n" % ( lname, path ))
+                continue
+
+            if l.GetGeomType() not in [ ogr.wkbPolygon, ogr.wkbMultiPolygon ]:
+                sys.stderr.write("Ebene '%s' in '%s' ist keine Fläche.\n" % ( lname, path ))
+                continue
+
+            sys.stderr.write("  Lade Layer '%s'.\n" % lname)
+
+            self._load_vg_layer(l)
+
+
+    def _load_vg_layer(self, l):
+        # Wir erlauben es Datensätze mehrerer Auflösungen zu laden. Daher
+        # müssen wir importierte Regionalschlüssel lokal speichern, um gröbere
+        # Geometrien für den selben Regionalschlüssel überschreiben zu können.
+        localars = set()
+        count = 0
+
+        for f in l:
+            ars = f.ARS_0
+
+            # Ungültige Regionalschlüssel überspringen
+            if len(ars) != 12:
+                continue
+
+            # Nur Landflächen mit Striktur berücksichtigen
+            if f.GF not in [ 4, 9 ]:
+                continue
+
+            # Geometrie in das WGS84-Referenzsystem transformieren
+            geom = f.GetGeometryRef()
+            geom.TransformTo(self.WGS84)
+
+            if ars not in localars:
+                self.ars[ars] = []
+                localars.add(ars)
+
+            geomtype = geom.GetGeometryType()
+            if geomtype == ogr.wkbPolygon:
+                self.ars[ars].append(geom.Clone())
+            elif geomtype == ogr.wkbMultiPolygon:
+                for i in range(geom.GetGeometryCount()):
+                    self.ars[ars].append(geom.GetGeometryRef(i).Clone())
+            else:
+                sys.stderr.write("    Nicht unterstützter Geometrietyp '%s'.\n" % geom.GetGeometryName())
+                continue
+
+            count += 1
+
+        sys.stderr.write("    %d Regionen mit %d Features geladen.\n" % ( len(localars), count ))
+
+
+    def ars_get(self, ars):
+        pass
 
 
 
@@ -966,6 +1054,7 @@ class TargetAprsKissTcp(TargetAprsKiss):
 with open('mowas.yml') as f:
     CONFIG = Config(yaml.safe_load(f), "Ungültiges Konfiguration")
 
+GEODATA = Geodata(CONFIG.get_subtree('geodata', "Ungültige Geodaten-Konfiguration", True))
 CACHE = Cache(CONFIG.get_subtree('cache', "Ungültige Cache-Konfiguration"))
 
 
