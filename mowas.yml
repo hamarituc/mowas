@@ -1,8 +1,5 @@
 geodata:
-  vg5000: 'geodata/DE_VG5000.gpkg'
-  #vg2500: 'geodata/DE_VG2500.gpkg'
-  #vg1000: 'geodata/DE_VG1000.gpkg'
-  #vg250: 'geodata/DE_VG250.gpkg'
+  path: 'mowas.gpkg'
 
 source:
  bbk_url:
