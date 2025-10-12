@@ -26,6 +26,16 @@ import yaml
 
 
 
+#
+# Spezifikationen
+#  - CAP: https://docs.oasis-open.org/emergency/cap/v1.2/CAP-v1.2-os.html
+#  - APRS:
+#    - https://raw.githubusercontent.com/wb2osz/aprsspec/main/Understanding-APRS-Packets.pdf
+#    - https://www.aprs.org/doc/APRS101.PDF
+#
+
+
+
 class JSONDateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime.date, datetime.time, datetime.datetime)):
