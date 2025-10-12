@@ -641,18 +641,20 @@ class TargetAprs(Target):
 
         self.sched = Schedule(config.get_subtree('schedule', "Ungültiger Widerholungsrhythmus für Senke '%s/%s'" % ( self.ttype, self.tname )))
 
-        config_aprs = config.get_subtree('aprs', "Ungültige APRS-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
+        config_aprs     = config.get_subtree('aprs', "Ungültige APRS-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
+        config_beacon   = config_aprs.get_subtree('beacon', "Ungültige Baken-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), optional = True)
+        config_bulletin = config_aprs.get_subtree('bulletin', "Ungültige Bulletin-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), optional = True)
 
         self.dstcall           = config_aprs.get_str('dstcall', 'APMOWA')
         self.mycall            = config_aprs.get_str('mycall')
         self.digipath          = config_aprs.get_list('digipath', [ 'WIDE1-1' ])
-        self.beacon_prefix     = config_aprs.get_str('beacon_prefix', 'MOWA')
         self.max_areas         = config_aprs.get_int('max_areas', 0)
-        self.no_position       = config_aprs.get_bool('no_position', False)
-        self.no_time           = config_aprs.get_bool('no_time', False)
-        self.compress_position = config_aprs.get_bool('compress_position', False)
-        self.bulletin_id       = config_aprs.get_str('bulletin_id', '0MOWAS')[0:6].ljust(6, ' ')
-        self.bulletin_mode     = config_aprs.get_str('bulletin_mode', 'fallback').lower()
+        self.beacon            = config_beacon.get_bool('enabled', True)
+        self.beacon_prefix     = config_beacon.get_str('prefix', 'MOWA')
+        self.beacon_time       = config_beacon.get_bool('time', True)
+        self.beacon_compressed = config_beacon.get_bool('compressed', False)
+        self.bulletin_id       = config_bulletin.get_str('id', '0MOWAS')[0:6].ljust(6, ' ')
+        self.bulletin_mode     = config_bulletin.get_str('mode', 'fallback').lower()
 
         if self.bulletin_mode not in [ 'never', 'fallback', 'always' ]:
             sys.stderr.write("Senke '%s/%s': Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück.\n" % ( self.ttype, self.tname, self.bulletin_mode ))
@@ -695,7 +697,7 @@ class TargetAprs(Target):
     # warnen.
     #
     def _get_pos(self, info):
-        if self.no_position:
+        if not self.beacon:
             return []
 
         # Wir behandeln jedes Gebiet einzeln.
@@ -745,7 +747,7 @@ class TargetAprs(Target):
     #
     def _get_time(self, info, capdata, t):
         # Generell auf Zeitangaben verzichten
-        if self.no_time:
+        if not self.beacon_time:
             return None
 
         # Es gibt mehrere Zeitstempel, die für das Ereigniss kodiert sein
@@ -862,7 +864,7 @@ class TargetAprs(Target):
             lat = (p.GetY() +  90.0) % 180 -  90.0
             lon = (p.GetX() + 180.0) % 360 - 180.0
 
-            if self.compress_position:
+            if self.beacon_compressed:
                 coord = APRSCompressedCoordinates(
                     lat = APRSCompressedLatitude(lat),
                     lng = APRSCompressedLongitude(lon),

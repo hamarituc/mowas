@@ -26,8 +26,11 @@ target:
         digipath:
           - 'WIDE1-1'
           - 'WIDE2-2'
-        beacon_prefix: 'MW'
-        bulletin_id: '0MOWAS'
+        beacon:
+          prefix: 'MW'
+        bulletin:
+          mode: 'always'
+          id: '0MOWAS'
       serial:
         device: '/dev/ttyUSB0'
         baud: 115200
