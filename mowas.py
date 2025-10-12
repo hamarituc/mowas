@@ -171,7 +171,7 @@ class Geodata:
 
 
     def ars_get(self, ars):
-        pass
+        return self.ars.get(ars, None)
 
 
 
@@ -721,6 +721,18 @@ class TargetAprs(Target):
                     ring.FlattenTo2D()
                     polygon.AddGeometry(ring)
                 polys.append(polygon)
+
+            # Enthält der Warndatensatz keine Gebietsangabe, verwenden wir den
+            # kodierten Regionalschlüssel und schlagen in der amtlichen
+            # Datenbank nach.
+            elif 'geocode' in area:
+                for geocode in area['geocode']:
+                    arsmultipolygon = GEODATA.ars_get(geocode['value'])
+                    if arsmultipolygon is None:
+                        sys.stderr.write("Gebietsschlüssel '%s' (%s) nicht in Polygon auflösbar.\n" % ( geocode['value'], geocode['valueName'] ))
+                    else:
+                        for i in range(arsmultipolygon.GetGeometryCount()):
+                            polys.append(arsmultipolygon.GetGeometryRef(i))
 
         # Zu viele Einzelflächen bei Bedarf zusammenführen
         if self.max_areas > 0 and len(polys) > self.max_areas:
