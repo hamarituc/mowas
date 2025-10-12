@@ -25,6 +25,8 @@ import socket
 import sys
 import yaml
 
+gdal.UseExceptions()
+
 
 
 #
