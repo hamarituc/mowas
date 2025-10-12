@@ -649,6 +649,7 @@ class TargetAprs(Target):
         self.mycall            = config_aprs.get_str('mycall')
         self.digipath          = config_aprs.get_list('digipath', [ 'WIDE1-1' ])
         self.max_areas         = config_aprs.get_int('max_areas', 0)
+        self.truncate          = config_aprs.get_bool('truncate_comment', True)
         self.beacon            = config_beacon.get_bool('enabled', True)
         self.beacon_prefix     = config_beacon.get_str('prefix', 'MOWA')
         self.beacon_time       = config_beacon.get_bool('time', True)
@@ -818,6 +819,14 @@ class TargetAprs(Target):
         if comment is None:
             return []
 
+        # Zu lange Meldungen bei Bedarf einkürzen.
+        if len(comment) > 67:
+            sys.stderr.write("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Bulletins.\n" % comment)
+            if self.truncate:
+                comment = comment[0:64]
+                sys.stderr.write("Kürze auf '%s'.\n" % comment)
+                comment += "..."
+
         packet = (':BLN%s:' % self.bulletin_id) + comment.replace('|', '').replace('~', '')
 
         frame = APRSFrame(
@@ -902,6 +911,16 @@ class TargetAprs(Target):
                     comment = "Unspezifische MoWaS-Warnung"
                 else:
                     comment = "Unspezifische MoWaS-Entwarnung"
+
+            # Zu lange Meldungen bei Bedarf einkürzen.
+            # TODO: Bei Area-Baken sind es max 36 Zeichen.
+            max_comment = 43
+            if len(comment) > max_comment:
+                sys.stderr.write("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Baken.\n" % comment)
+                if self.truncate:
+                    comment = comment[0:max_comment - 3]
+                    sys.stderr.write("Kürze auf '%s'.\n" % comment)
+                    comment += "..."
 
             packet += comment
 
