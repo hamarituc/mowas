@@ -701,10 +701,10 @@ class TargetAprs(Target):
         if not self.beacon:
             return []
 
+        polys = []
+
         # Wir behandeln jedes Gebiet einzeln.
         for area in info['area']:
-            polys = []
-
             # Polygon in eine geometrische Datenstruktur überführen.
             # Selbst ein Gebiet kann aus mehreren Polygonen bestehen. Dies ist
             # z.B. bei Flächen mit Löchern der Fall. Wir müssen uns aber nicht
