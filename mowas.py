@@ -10,6 +10,7 @@ from aioax25.aprs.position import APRSCompressedLongitude
 from aioax25.aprs.position import APRSCompressedCoordinates
 from aioax25.aprs.symbol import APRSSymbol
 from aioax25.frame import AX25Address
+import argparse
 import copy
 import datetime
 import json
@@ -33,6 +34,22 @@ import yaml
 #    - https://raw.githubusercontent.com/wb2osz/aprsspec/main/Understanding-APRS-Packets.pdf
 #    - https://www.aprs.org/doc/APRS101.PDF
 #
+
+
+
+parser = argparse.ArgumentParser(
+    description = "MoWaS-Alarmierung verarbeiten"
+)
+
+parser.add_argument(
+    '-c', '--config',
+    type = str,
+    default = '/etc/mowas.yml',
+    metavar = 'FILE',
+    help = "Konfigurationsdatei")
+
+
+ARGS = parser.parse_args()
 
 
 
@@ -1052,8 +1069,8 @@ class TargetAprsKissTcp(TargetAprsKiss):
 
 
 # Konfiguration einlesen
-with open('mowas.yml') as f:
-    CONFIG = Config(yaml.safe_load(f), "Ungültiges Konfiguration")
+with open(ARGS.config) as f:
+    CONFIG = Config(yaml.safe_load(f), "Ungültige Konfiguration")
 
 GEODATA = Geodata(CONFIG.get_subtree('geodata', "Ungültige Geodaten-Konfiguration", True))
 CACHE = Cache(CONFIG.get_subtree('cache', "Ungültige Cache-Konfiguration"))
