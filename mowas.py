@@ -134,7 +134,7 @@ class Config:
 
 
     def get_int(self, key, default = None, null = False):
-        value = self._get_value(key, default)
+        value = self._get_value(key, default, null)
         if value is None and null:
             return value
         if not isinstance(value, int):
@@ -143,7 +143,7 @@ class Config:
 
 
     def get_str(self, key, default = None, null = False):
-        value = self._get_value(key, default)
+        value = self._get_value(key, default, null)
         if value is None and null:
             return value
         if not isinstance(value, str):
