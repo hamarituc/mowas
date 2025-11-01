@@ -6,8 +6,9 @@ geodata:
   path: 'mowas.gpkg'
 
 source:
- bbk_url:
-   - url: 'https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json'
+  bbk_url:
+    MOWAS:
+      url: 'https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json'
 
 cache:
   path: 'cache.json'

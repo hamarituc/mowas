@@ -311,8 +311,9 @@ class Alert:
 
 
 class Source:
-    def __init__(self):
-        self.logger = logging.getLogger('mowas.source.%s' % self.stype)
+    def __init__(self, sname):
+        self.sname = sname
+        self.logger = logging.getLogger('mowas.source.%s.%s' % ( self.stype, self.sname ))
 
 
 
@@ -320,8 +321,8 @@ class SourceBBKFile(Source):
     stype = 'bbk_file'
 
 
-    def __init__(self, config):
-        super().__init__()
+    def __init__(self, sname, config):
+        super().__init__(sname)
 
         self.path = config.get_str('path')
 
@@ -344,8 +345,8 @@ class SourceBBKUrl(Source):
     stype = 'bbk_url'
 
 
-    def __init__(self, config):
-        super().__init__()
+    def __init__(self, sname, config):
+        super().__init__(sname)
 
         self.url = config.get_str('url')
 
@@ -1198,10 +1199,19 @@ CACHE = Cache(CONFIG.get_subtree('cache', "Ungültige Cache-Konfiguration"))
 
 
 # Quellen initialisieren
+SOURCE_CLASSES = \
+[
+    ( 'bbk_file', SourceBBKFile ),
+    ( 'bbk_url',  SourceBBKUrl  ),
+]
+
 SOURCE_CONFIG = CONFIG.get_subtree('source', "Ungültige Quellen-Konfiguration")
 SOURCES = []
-for s in SOURCE_CONFIG.get_list('bbk_url', []):
-    SOURCES.append(SourceBBKUrl(Config(s, "Ungültige Konfiguration für BBK-URL-Quelle")))
+for stype, sclass in SOURCE_CLASSES:
+    sources = SOURCE_CONFIG.get_dict(stype, {})
+    for sname, s in sources.items():
+        SOURCES.append(sclass(sname, Config(s, "Ungültige Konfiguration für Quelle '%s/%s'" % ( stype, sname ))))
+
 
 # Senken initialisieren
 TARGET_CLASSES = \
