@@ -24,6 +24,7 @@ import requests
 import serial
 import socket
 import sys
+import time
 import yaml
 
 gdal.UseExceptions()
@@ -1214,23 +1215,46 @@ for ttype, tclass in TARGET_CLASSES:
         TARGETS.append(tclass(tname, Config(t, "Ungültige Konfiguration für Senke '%s/%s'" % ( ttype, tname ))))
 
 
-for s in SOURCES:
+# Prüfintervall festlegen
+PERIOD = 60
+
+# Hauptschleife
+while True:
     try:
-        for alert in s.fetch():
-            CACHE.update(alert)
-    except Exception as e:
-        LOGGER.error("Fehler beim Abfragen der Quelle '%s'" % s.stype)
-        LOGGER.exception(e)
+        # Zeit bestimmen
+        t1 = datetime.datetime.now(datetime.UTC)
 
-valid  = CACHE.purge()
-CACHE.persistent_ids()
-alerts = CACHE.query()
+        LOGGER.debug("Alarmierungsschleife beginnt.")
 
-for t in TARGETS:
-    try:
-        t.alert(alerts)
-    except Exception as e:
-        LOGGER.error("Fehler bei der Alarmierung über Senke '%s/%s'" % ( t.ttype, t.tname ))
-        LOGGER.exception(e)
+        for s in SOURCES:
+            try:
+                for alert in s.fetch():
+                    CACHE.update(alert)
+            except Exception as e:
+                LOGGER.error("Fehler beim Abfragen der Quelle '%s'" % s.stype)
+                LOGGER.exception(e)
 
-CACHE.dump()
+        valid  = CACHE.purge()
+        CACHE.persistent_ids()
+        alerts = CACHE.query()
+
+        for t in TARGETS:
+            try:
+                t.alert(alerts)
+            except Exception as e:
+                LOGGER.error("Fehler bei der Alarmierung über Senke '%s/%s'" % ( t.ttype, t.tname ))
+                LOGGER.exception(e)
+
+        CACHE.dump()
+
+        LOGGER.debug("Alarmierungsschleife abgearbeitet.")
+
+        # Zeit bestimmen
+        t2 = datetime.datetime.now(datetime.UTC)
+
+        # Wartezeit ausrechnen, sodass wir die Schleife in passender Phasenlage
+        # zu `t1` wieder beginnen.
+        time.sleep((t1 - t2).total_seconds() % PERIOD)
+
+    except KeyboardInterrupt:
+        break
