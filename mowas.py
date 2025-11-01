@@ -14,6 +14,7 @@ import argparse
 import copy
 import datetime
 import json
+import logging
 import os
 from osgeo import gdal
 from osgeo import ogr
@@ -49,6 +50,24 @@ parser.add_argument(
     default = '/etc/mowas.yml',
     metavar = 'FILE',
     help = "Konfigurationsdatei")
+
+parser.add_argument(
+    '--log-level',
+    type = str,
+    metavar = 'LEVEL',
+    choices = [ 'error', 'warning', 'info', 'debug' ],
+    help = "Log-Level")
+
+parser.add_argument(
+    '--log-console',
+    action = 'store_true',
+    help = "Auf Konsole loggen")
+
+parser.add_argument(
+    '--log-file',
+    type = str,
+    metavar = 'FILE',
+    help = "Log-Datei")
 
 
 ARGS = parser.parse_args()
@@ -159,6 +178,8 @@ class Config:
 
 class Geodata:
     def __init__(self, config):
+        self.logger = logging.getLogger('mowas.geodata')
+
         self.ars = {}
 
         self._load(config.get_str('path', None))
@@ -168,21 +189,21 @@ class Geodata:
         if path is None:
             return
 
-        sys.stderr.write("Lade '%s'.\n" % path)
+        self.logger.info("Lade '%s'." % path)
 
         ds = gdal.OpenEx(path, gdal.OF_READONLY)
         if ds is None:
-            sys.stderr.write("Kann '%s' nicht öffnen.\n" % path)
+            self.logger.error("Kann '%s' nicht öffnen." % path)
             return
 
         l = ds.GetLayer('region')
 
         if l is None:
-            sys.stderr.write("Ebene 'region' in '%s' nicht vorhanden.\n" % path )
+            self.logger.error("Ebene 'region' in '%s' nicht vorhanden." % path)
             return
 
         if l.GetGeomType() not in [ ogr.wkbPolygon, ogr.wkbMultiPolygon ]:
-            sys.stderr.write("Ebene 'region' in '%s' enthält keine Polygone.\n" % path )
+            self.logger.error("Ebene 'region' in '%s' enthält keine Polygone." % path)
             return
 
         for f in l:
@@ -194,7 +215,7 @@ class Geodata:
 
             self.ars[ars] = f.GetGeometryRef().Clone()
 
-        sys.stderr.write("%d Regionen geladen.\n" % len(self.ars))
+        self.logger.info("%d Regionen geladen." % len(self.ars))
 
 
     def ars_get(self, ars):
@@ -288,8 +309,43 @@ class Alert:
 
 
 
-class SourceBBKUrl:
+class Source:
+    def __init__(self):
+        self.logger = logging.getLogger('mowas.source.%s' % self.stype)
+
+
+
+class SourceBBKFile(Source):
+    stype = 'bbk_file'
+
+
     def __init__(self, config):
+        super().__init__()
+
+        self.path = config.get_str('path')
+
+
+    def fetch(self):
+        with open(self.path) as f:
+            try:
+                capdata = json.load(f)
+            except json.decoder.JSONDecodeError:
+                self.logger.error("Fehler beim Laden der Warnung '%s'." % self.path)
+                self.logger.exception(e)
+                return
+
+        for alertdata in capdata:
+            yield Alert(alertdata)
+
+
+
+class SourceBBKUrl(Source):
+    stype = 'bbk_url'
+
+
+    def __init__(self, config):
+        super().__init__()
+
         self.url = config.get_str('url')
 
 
@@ -298,13 +354,15 @@ class SourceBBKUrl:
         try:
             r.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            sys.stderr.write("Fehler bei der Abfrage von '%s': %s\n" % ( self.url, e ))
+            self.logger.error("Fehler bei der Abfrage von '%s'." % self.url)
+            self.logger.eception(e)
             return
 
         try:
             capdata = r.json()
         except requests.exceptions.JSONDecodeError as e:
-            sys.stderr.write("Fehler beim Parsen der Rückgabe von '%s': %s\n" % ( self.url, e ))
+            self.logger.error("Fehler beim Laden der Rückgabe von '%s'." % self.url)
+            self.logger.exception(e)
             return
 
         for alertdata in capdata:
@@ -314,6 +372,8 @@ class SourceBBKUrl:
 
 class Cache:
     def __init__(self, config):
+        self.logger = logging.getLogger('mowas.cache')
+
         self.path = config.get_str('path')
         self.age  = config.get_duration('purge', '31d')
 
@@ -323,10 +383,12 @@ class Cache:
             with open(self.path) as f:
                 try:
                     data = json.load(f)
-                except json.decoder.JSONDecodeError:
-                    sys.stderr.write("Fehler beim Laden des Caches '%s'." % self.path)
+                except json.decoder.JSONDecodeError as e:
+                    self.logger.error("Fehler beim Laden des Caches '%s'." % self.path)
+                    self.logger.exception(e)
                     return
         else:
+            self.logger.debug("Cache '%s' existiert nicht." % self.path)
             return
 
         for aid, alertdata in data.items():
@@ -460,7 +522,7 @@ class Cache:
             nopids = nopids_new
 
         if aid in nopids.keys():
-            sys.stderr.write("Warnung '%s' ist Bestandteil eines zirkulären Verweises." % aid)
+            self.logger.error("Warnung '%s' ist Bestandteil eines zirkulären Verweises." % aid)
             # TODO: einzelne IDs vergeben?
 
 
@@ -499,7 +561,9 @@ class Filter:
         return { g for g in geocodes if not (self._area_superset(g) - { g }) & set(geocodes) }
 
 
-    def __init__(self, config):
+    def __init__(self, config, logger):
+        self.logger = logger
+
         # Gebietsschlüssel auf Plausibilität prüfen.
         geocodes = []
         for i, r in enumerate(config.get_list('geocodes', [])):
@@ -510,7 +574,7 @@ class Filter:
                 raise ConfigException("Ungültiger Gebietsschlüssel '%s': Nur Ziffern erlaubt." % r)
 
             if len(r) > 12:
-                sys.stderr.write("Ungültiger Gebietsschlüssel '%s': Zu lang. Kürze auf 12 Stellen.\n" % r)
+                self.logger.warning("Ungültiger Gebietsschlüssel '%s': Zu lang. Kürze auf 12 Stellen." % r)
                 geocodes.append(r[0:12])
             elif len(r) in [ 2, 3, 5, 9, 12 ]:
                 # Zu Kurze Regionalschlüssel ggf. erweitern
@@ -602,7 +666,9 @@ class Schedule:
 class Target:
     def __init__(self, tname, config):
         self.tname = tname
-        self.filter = Filter(config.get_subtree('filter', "Ungültige Filter-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), True))
+        self.logger = logging.getLogger('mowas.target.%s.%s' % ( self.ttype, self.tname ))
+
+        self.filter = Filter(config.get_subtree('filter', "Ungültige Filter-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), True), self.logger)
 
 
     def query(self, alerts, t):
@@ -685,7 +751,7 @@ class TargetAprs(Target):
         self.bulletin_mode     = config_bulletin.get_str('mode', 'fallback').lower()
 
         if self.bulletin_mode not in [ 'never', 'fallback', 'always' ]:
-            sys.stderr.write("Senke '%s/%s': Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück.\n" % ( self.ttype, self.tname, self.bulletin_mode ))
+            self.logger.warning("Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück." % self.bulletin_mode)
             self.bulletin_mode = 'fallback'
 
 
@@ -756,7 +822,7 @@ class TargetAprs(Target):
                 for geocode in area['geocode']:
                     arsmultipolygon = GEODATA.ars_get(geocode['value'])
                     if arsmultipolygon is None:
-                        sys.stderr.write("Gebietsschlüssel '%s' (%s) nicht in Polygon auflösbar.\n" % ( geocode['value'], geocode['valueName'] ))
+                        self.logger.warning("Gebietsschlüssel '%s' (%s) nicht in Polygon auflösbar." % ( geocode['value'], geocode['valueName'] ))
                     else:
                         for i in range(arsmultipolygon.GetGeometryCount()):
                             polys.append(arsmultipolygon.GetGeometryRef(i))
@@ -860,10 +926,10 @@ class TargetAprs(Target):
 
         # Zu lange Meldungen bei Bedarf einkürzen.
         if len(comment) > 67:
-            sys.stderr.write("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Bulletins.\n" % comment)
+            self.logger.warning("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Bulletins." % comment)
             if self.truncate:
                 comment = comment[0:64]
-                sys.stderr.write("Kürze auf '%s'.\n" % comment)
+                self.logger.info("Kürze auf '%s'." % comment)
                 comment += "..."
 
         packet = (':BLN%s:' % self.bulletin_id) + comment.replace('|', '').replace('~', '')
@@ -906,7 +972,7 @@ class TargetAprs(Target):
 
             if len(call) > 9:
                 newcall = call[:9]
-                sys.stderr.write("APRS-Objektbezeichnung '%s' zu lang. Kürze auf '%s'.\n" % ( call, newcall ))
+                self.logger.warning("APRS-Objektbezeichnung '%s' zu lang. Kürze auf '%s'." % ( call, newcall ))
                 call = newcall
 
             lat = (p.GetY() +  90.0) % 180 -  90.0
@@ -955,10 +1021,10 @@ class TargetAprs(Target):
             # TODO: Bei Area-Baken sind es max 36 Zeichen.
             max_comment = 43
             if len(comment) > max_comment:
-                sys.stderr.write("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Baken.\n" % comment)
+                self.logger.warning("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Baken." % comment)
                 if self.truncate:
                     comment = comment[0:max_comment - 3]
-                    sys.stderr.write("Kürze auf '%s'.\n" % comment)
+                    self.logger.info("Kürze auf '%s'." % comment)
                     comment += "..."
 
             packet += comment
@@ -1082,7 +1148,48 @@ class TargetAprsKissTcp(TargetAprsKiss):
 with open(ARGS.config) as f:
     CONFIG = Config(yaml.safe_load(f), "Ungültige Konfiguration")
 
-GEODATA = Geodata(CONFIG.get_subtree('geodata', "Ungültige Geodaten-Konfiguration", True))
+
+# Logging konfigurieren
+log_config = CONFIG.get_subtree('logging', "Ungültige Logging-Konfiguration", optional = True)
+
+log_fmt = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
+log_level = ARGS.log_level or log_config.get_str('level', 'warning').lower()
+log_console = True if ARGS.log_console else log_config.get_bool('console', True)
+log_file    = ARGS.log_file or log_config.get_str('file', null = True)
+
+LOG_LEVELS = \
+{
+    'error':   logging.ERROR,
+    'warning': logging.WARNING,
+    'info':    logging.INFO,
+    'debug':   logging.DEBUG,
+}
+
+LOGGER = logging.getLogger('mowas')
+
+if log_level not in LOG_LEVELS:
+    LOGGER.setLevel(logging.WARNING)
+    log_fallback = True
+else:
+    LOGGER.setLevel(LOG_LEVELS[log_level])
+    log_fallback = False
+
+if log_console:
+    log_console_handler = logging.StreamHandler(stream = sys.stdout)
+    log_console_handler.setFormatter(log_fmt)
+    LOGGER.addHandler(log_console_handler)
+
+if log_file is not None:
+    log_file_handler = logging.FileHandler(log_file)
+    log_file_handler.setFormatter(log_fmt)
+    LOGGER.addHandler(log_file_handler)
+
+if log_fallback:
+    LOGGER.warning("Unbekannter Log-Level '%s'. Falle auf 'warning' zurück." % log_level)
+
+
+# Datenstrukturen initialisieren
+GEODATA = Geodata(CONFIG.get_subtree('geodata', "Ungültige Geodaten-Konfiguration", optional = True))
 CACHE = Cache(CONFIG.get_subtree('cache', "Ungültige Cache-Konfiguration"))
 
 
@@ -1108,14 +1215,22 @@ for ttype, tclass in TARGET_CLASSES:
 
 
 for s in SOURCES:
-    for alert in s.fetch():
-        CACHE.update(alert)
+    try:
+        for alert in s.fetch():
+            CACHE.update(alert)
+    except Exception as e:
+        LOGGER.error("Fehler beim Abfragen der Quelle '%s'" % s.stype)
+        LOGGER.exception(e)
 
 valid  = CACHE.purge()
 CACHE.persistent_ids()
 alerts = CACHE.query()
 
 for t in TARGETS:
-    t.alert(alerts)
+    try:
+        t.alert(alerts)
+    except Exception as e:
+        LOGGER.error("Fehler bei der Alarmierung über Senke '%s/%s'" % ( t.ttype, t.tname ))
+        LOGGER.exception(e)
 
 CACHE.dump()

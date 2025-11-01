@@ -1,3 +1,7 @@
+logging:
+  level: 'INFO'
+  console: true
+
 geodata:
   path: 'mowas.gpkg'
 
