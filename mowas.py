@@ -1136,12 +1136,15 @@ class TargetAprsKissTcp(TargetAprsKiss):
     def send(self, frames):
         kissdata = super().send(frames)
 
-        sock = socket.socket()
-        sock.connect(( self.remote_host, self.remote_port ))
-        sock.shutdown(socket.SHUT_RD)
-        sock.send(kissdata)
-        sock.shutdown(socket.SHUT_WR)
-        sock.close()
+        try:
+            sock = socket.socket()
+            sock.connect(( self.remote_host, self.remote_port ))
+            sock.shutdown(socket.SHUT_RD)
+            sock.send(kissdata)
+            sock.shutdown(socket.SHUT_WR)
+            sock.close()
+        except ConnectionRefusedError:
+            self.logger.error("Kann keine Verbindung zum TNC '%s:%s' aufbauen. Es wird nicht alarmiert." % ( self.remote_host, self.remote_port ))
 
 
 
