@@ -792,7 +792,7 @@ class TargetAprs(Target):
     # jedoch kein Fehler, da wir dann in der Lage sind per APRS-Bulletin zu
     # warnen.
     #
-    def _get_pos(self, info):
+    def _get_pos(self, alert, info):
         if not self.beacon:
             return []
 
@@ -809,7 +809,22 @@ class TargetAprs(Target):
                 polygon = ogr.Geometry(ogr.wkbPolygon)
                 for ringstr in area['polygon']:
                     ring = ogr.Geometry(ogr.wkbLinearRing)
-                    for coords in ringstr.split():
+                    ringcoords = ringstr.split()
+
+                    # Manche Geometrien enthalten einen falschen Punkt `-1 -1`
+                    # als erste Koordinate. Wir reparieren diesen Fehler.
+                    if len(ringcoords) > 2:
+                        if ringcoords[0] == '-1.0,-1.0' and ringcoords[1] == ringcoords[-1]:
+                            ringcoords = ringcoords[1:]
+                            self.logger.info("Geometrie von Warnung '%s' enthält ungültige Koordinate `-1.0 -1.0`. Diese wurde entfernt, um die Geometrie zu reparieren." % alert.aid)
+
+                    # Zur Sicherheit prüfen wir, ob die Ringe geschlossen sind.
+                    # Wir könnten sie alternativ auch schließen.
+                    if ringcoords[0] != ringcoords[-1]:
+                        self.logger.error("Geometrie von Warnung '%s' hat nicht geschlossen Polygonringe. Diese Gebieter werden verworfen." % alert.aid)
+                        continue
+
+                    for coords in ringcoords:
                         x, y = coords.split(',')
                         ring.AddPoint(float(x), float(y))
 
@@ -1061,7 +1076,7 @@ class TargetAprs(Target):
             # APRS-Objekte.
             for infoidx, info in enumerate(capdata['info']):
                 symbol = APRSSymbol('\\', '\'')
-                pos = self._get_pos(info)
+                pos = self._get_pos(alert, info)
                 time = self._get_time(info, capdata, t)
                 comment = self._get_comment(info)
 
