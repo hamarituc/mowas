@@ -96,9 +96,13 @@ class Config:
         return Config(subtree, errmsg)
 
 
-    def _get_value(self, key, default = None):
+    def _get_value(self, key, default = None, null = False):
         if default is None and key not in self.tree:
-            raise ConfigException("Attribut '%s' ist erfordertlich.\n" % key)
+            if null:
+                return None
+            else:
+                raise ConfigException("Attribut '%s' ist erforderlich.\n" % key)
+
         return self.tree.get(key, default)
 
 
@@ -109,15 +113,19 @@ class Config:
         return value
 
 
-    def get_int(self, key, default = None):
+    def get_int(self, key, default = None, null = False):
         value = self._get_value(key, default)
+        if value is None and null:
+            return value
         if not isinstance(value, int):
             raise ConfigException("Ungültiges Attribut '%s': Ganzzahl erwartet." % key)
         return value
 
 
-    def get_str(self, key, default = None):
+    def get_str(self, key, default = None, null = False):
         value = self._get_value(key, default)
+        if value is None and null:
+            return value
         if not isinstance(value, str):
             raise ConfigException("Ungültiges Attribut '%s': String erwartet." % key)
         return value
