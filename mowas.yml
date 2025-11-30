@@ -6,6 +6,13 @@ geodata:
   path: 'mowas.gpkg'
 
 source:
+  darc:
+    DARC:
+      dir_json: 'darc/'
+      dir_cap: 'darc/'
+      dir_audio: 'darc/'
+      fetch_internet: true
+      fetch_hamnet: false
   bbk_url:
     MOWAS:
       url: 'https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json'

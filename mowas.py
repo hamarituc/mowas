@@ -19,12 +19,14 @@ import os
 from osgeo import gdal
 from osgeo import ogr
 import pytz
+import random
 import re
 import requests
 import serial
 import socket
 import sys
 import time
+import xmltodict
 import yaml
 
 gdal.UseExceptions()
@@ -314,6 +316,122 @@ class Source:
     def __init__(self, sname):
         self.sname = sname
         self.logger = logging.getLogger('mowas.source.%s.%s' % ( self.stype, self.sname ))
+
+
+
+class SourceDARC(Source):
+    stype = 'darc'
+
+
+    def __init__(self, sname, config):
+        super().__init__(sname)
+
+        self.dir_json  = config.get_str('dir_json')
+        self.dir_cap   = config.get_str('dir_cap')
+        self.dir_audio = config.get_str('dir_audio', null = True)
+
+        self.fetch_internet = config.get_bool('fetch_internet', False)
+        self.fetch_hamnet   = config.get_bool('fetch_hamnet',   False)
+
+        if not self.fetch_internet and not self.fetch_hamnet:
+            raise ConfigException("Quelle 'DARC', Parameter 'fetch': Mind. eine Download-Quelle muss aktiviert sein.")
+
+        if not os.path.isdir(self.dir_json):
+            raise ConfigException("Quelle 'DARC', Parameter 'dir_json': '%s' ist kein Verzeichnis" % self.dir_json)
+
+        if not os.path.isdir(self.dir_cap):
+            raise ConfigException("Quelle 'DARC', Parameter 'dir_cap': '%s' ist kein Verzeichnis" % self.dir_cap)
+
+        if self.dir_audio is not None and not os.path.isdir(self.dir_audio):
+            raise ConfigException("Quelle 'DARC', Parameter 'dir_audio': '%s' ist kein Verzeichnis" % self.dir_audio)
+
+
+    def _fetch_file(self, path, urls):
+        # Nichts tun, wenn File bereits existiert
+        if os.path.isfile(path):
+            self.logger.debug("Datei '%s' bereit vorhanden. Download nicht notwendig." % path)
+            return True
+
+        # URLs in zufälliger Reihenfolge abfragen
+        random.shuffle(urls)
+        for url in urls:
+            self.logger.debug("Download von '%s'." % url)
+            r = requests.get(url)
+            try:
+                r.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                self.logger.warning("Fehler beim Download von '%s'." % url)
+                self.logger.exception(e)
+                continue
+
+            self.logger.debug("Download von '%s' erfolgreich.")
+            with open(path, 'wb') as f:
+                f.write(r.content)
+
+            return True
+
+        self.logger.warning("Download von '%s' nicht möglich." % path)
+
+        return False
+
+
+    def fetch(self):
+        with os.scandir(self.dir_json) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+
+                _, ext = os.path.splitext(entry.name)
+                if ext != '.json':
+                    continue
+
+                with open(entry) as f:
+                    try:
+                        darc_alert = json.load(f)
+                    except json.decoder.JSONDecodeError:
+                        self.logger.error("Fehler beim Laden der Warnung '%s'." % entry)
+                        self.logger.exception(e)
+                        continue
+
+                path_cap = os.path.join(self.dir_cap, "%s.xml" % darc_alert['id'])
+                sources_cap = []
+                if self.fetch_internet:
+                    sources_cap.extend(darc_alert['url']['xml']['internet'])
+                if self.fetch_hamnet:
+                    sources_cap.extend(darc_alert['url']['xml']['hamnet'])
+
+                if not self._fetch_file(path_cap, sources_cap):
+                    # Ohne CAP-Daten können wir nicht weiter arbeiten.
+                    self.logger.warning("Warnung '%s' kann nicht verarbeitet werden, da keine CAP-Daten vorliegen." % entry)
+                    continue
+
+                with open(path_cap) as f:
+                    capdata = xmltodict.parse(f.read())
+                capdata = capdata['alert']
+                del capdata['@xmlns']
+
+                if 'info' in capdata and not isinstance(capdata['info'], list):
+                    capdata['info'] = [ capdata['info'] ]
+                for i in capdata['info']:
+                    if 'resource' in i and not isinstance(i['resource'], list):
+                        i['resource'] = [ i['resource'] ]
+                    if 'area' in i and not isinstance(i['area'], list):
+                        i['area'] = [ i['area'] ]
+
+                alert = Alert(capdata)
+
+                if self.dir_audio is not None:
+                    path_audio = os.path.join(self.dir_audio, "%s.wav" % darc_alert['id'])
+                    sources_audio = []
+                    if self.fetch_internet:
+                        sources_audio.extend(darc_alert['url']['audio']['internet'])
+                    if self.fetch_hamnet:
+                        sources_audio.extend(darc_alert['url']['audio']['hamnet'])
+
+                    if self._fetch_file(path_audio, sources_audio):
+                        alert.attr_set('path_audio', path_audio)
+
+                yield alert
 
 
 
@@ -1216,6 +1334,7 @@ CACHE = Cache(CONFIG.get_subtree('cache', "Ungültige Cache-Konfiguration"))
 # Quellen initialisieren
 SOURCE_CLASSES = \
 [
+    ( 'darc',     SourceDARC    ),
     ( 'bbk_file', SourceBBKFile ),
     ( 'bbk_url',  SourceBBKUrl  ),
 ]
