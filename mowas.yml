@@ -16,6 +16,14 @@ source:
   bbk_url:
     MOWAS:
       url: 'https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json'
+    KATWARN:
+      url: 'https://warnung.bund.de/bbk.katwarn/warnmeldungen.json'
+    BIWAP:
+      url: 'https://warnung.bund.de/bbk.biwapp/warnmeldungen.json'
+    DWD:
+      url: 'https://warnung.bund.de/bbk.dwd/unwetter.json'
+    LHP:
+      url: 'https://warnung.bund.de/bbk.lhp/hochwassermeldungen.json'
 
 cache:
   path: 'cache.json'
