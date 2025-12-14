@@ -89,6 +89,7 @@ class ConfigException(Exception):
     pass
 
 
+
 def parse_duration(s):
     match = re.fullmatch('([0-9]+)([mhdw]?)', s)
     if match is None:
@@ -105,6 +106,7 @@ def parse_duration(s):
         t *= 60 * 24 * 7
 
     return t
+
 
 
 class Config:
@@ -139,7 +141,7 @@ class Config:
     def get_int(self, key, default = None, null = False):
         value = self._get_value(key, default, null)
         if value is None and null:
-            return value
+            return None
         if not isinstance(value, int):
             raise ConfigException("Ungültiges Attribut '%s': Ganzzahl erwartet." % key)
         return value
@@ -148,7 +150,7 @@ class Config:
     def get_str(self, key, default = None, null = False):
         value = self._get_value(key, default, null)
         if value is None and null:
-            return value
+            return None
         if not isinstance(value, str):
             raise ConfigException("Ungültiges Attribut '%s': String erwartet." % key)
         return value
@@ -258,6 +260,10 @@ class Alert:
                 i['expires'] = datetime.datetime.fromisoformat(i['expires'])
 
         self.capdata = capdata
+
+
+    def __str__(self):
+        return self.aid
 
 
     @property
