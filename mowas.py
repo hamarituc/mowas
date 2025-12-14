@@ -1106,6 +1106,15 @@ class TargetAprs(Target):
 
         # Unicode-Umlaute werden auf Mobilgeräten evt. nicht korrekt
         # dargestellt.
+        comment = comment.replace('ÄE', 'AE')
+        comment = comment.replace('ÖE', 'OE')
+        comment = comment.replace('ÜE', 'UE')
+        comment = comment.replace('Äe', 'Ae')
+        comment = comment.replace('Öe', 'Oe')
+        comment = comment.replace('Üe', 'Ue')
+        comment = comment.replace('äe', 'ae')
+        comment = comment.replace('oe', 'oe')
+        comment = comment.replace('üe', 'ue')
         comment = re.sub(r'Ä([A-Z])', r'AE\1', comment)
         comment = re.sub(r'Ö([A-Z])', r'OE\1', comment)
         comment = re.sub(r'Ü([A-Z])', r'UE\1', comment)
