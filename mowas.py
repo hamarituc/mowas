@@ -317,6 +317,9 @@ class Source:
         self.sname = sname
         self.logger = logging.getLogger('mowas.source.%s.%s' % ( self.stype, self.sname ))
 
+    def purge(self, valid):
+        pass
+
 
 
 class SourceDARC(Source):
@@ -344,6 +347,47 @@ class SourceDARC(Source):
 
         if self.dir_audio is not None and not os.path.isdir(self.dir_audio):
             raise ConfigException("Quelle 'DARC', Parameter 'dir_audio': '%s' ist kein Verzeichnis" % self.dir_audio)
+
+
+    def _read_alert(self):
+        with os.scandir(self.dir_json) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+
+                _, ext = os.path.splitext(entry.name)
+                if ext != '.json':
+                    continue
+
+                with open(entry) as f:
+                    try:
+                        darc_alert = json.load(f)
+                    except json.decoder.JSONDecodeError:
+                        self.logger.error("Fehler beim Laden der Warnung '%s'." % entry)
+                        self.logger.exception(e)
+                        continue
+
+                yield entry.path, darc_alert
+
+
+    def _read_cap(self, path):
+        if not os.path.isfile(path):
+            return None
+
+        with open(path) as f:
+            capdata = xmltodict.parse(f.read())
+        capdata = capdata['alert']
+        del capdata['@xmlns']
+
+        if 'info' in capdata and not isinstance(capdata['info'], list):
+            capdata['info'] = [ capdata['info'] ]
+        for i in capdata['info']:
+            if 'resource' in i and not isinstance(i['resource'], list):
+                i['resource'] = [ i['resource'] ]
+            if 'area' in i and not isinstance(i['area'], list):
+                i['area'] = [ i['area'] ]
+
+        return Alert(capdata)
 
 
     def _fetch_file(self, path, urls):
@@ -376,62 +420,93 @@ class SourceDARC(Source):
 
 
     def fetch(self):
-        with os.scandir(self.dir_json) as it:
-            for entry in it:
-                if not entry.is_file():
-                    continue
+        for path_json, darc_alert in self._read_alert():
+            path_cap = os.path.join(self.dir_cap, "%s.xml" % darc_alert['id'])
+            sources_cap = []
+            if self.fetch_internet:
+                sources_cap.extend(darc_alert['url']['xml']['internet'])
+            if self.fetch_hamnet:
+                sources_cap.extend(darc_alert['url']['xml']['hamnet'])
 
-                _, ext = os.path.splitext(entry.name)
-                if ext != '.json':
-                    continue
+            if not self._fetch_file(path_cap, sources_cap):
+                # Ohne CAP-Daten können wir nicht weiter arbeiten.
+                self.logger.warning("Warnung '%s' kann nicht verarbeitet werden, da keine CAP-Daten vorliegen." % path_json)
+                continue
 
-                with open(entry) as f:
-                    try:
-                        darc_alert = json.load(f)
-                    except json.decoder.JSONDecodeError:
-                        self.logger.error("Fehler beim Laden der Warnung '%s'." % entry)
-                        self.logger.exception(e)
+            alert = self._read_cap(path_cap)
+
+            if self.dir_audio is not None:
+                path_audio = os.path.join(self.dir_audio, "%s.wav" % darc_alert['id'])
+                sources_audio = []
+                if self.fetch_internet:
+                    sources_audio.extend(darc_alert['url']['audio']['internet'])
+                if self.fetch_hamnet:
+                    sources_audio.extend(darc_alert['url']['audio']['hamnet'])
+
+                if self._fetch_file(path_audio, sources_audio):
+                    alert.attr_set('path_audio', path_audio)
+
+            yield alert
+
+
+    def purge(self, valid):
+        super().purge(valid)
+
+        files_keep = set()
+        files_remove = set()
+
+        # Alle Files einlesen
+        for path_json, darc_alert in self._read_alert():
+            path_cap = os.path.join(self.dir_cap, "%s.xml" % darc_alert['id'])
+
+            if self.dir_audio is not None:
+                path_audio = os.path.join(self.dir_audio, "%s.wav" % darc_alert['id'])
+            else:
+                path_audio = None
+
+            alert = self._read_cap(path_cap)
+
+            # Warnungen überspringen, zu denen wir keinen CAP-Datensatz
+            # vorliegen haben. Der CAP-Datensatz kann z.B. durch einen
+            # Netzwerkfehler nicht heruntergeladen worden sein. Wenn wir jetzt
+            # das Alarmierungs-File löschen, würde es im nächsten Durchlauf
+            # keinen Versuch mehr geben, den CAP-Datensatz erneut
+            # herunterzuladen.
+            if alert is None:
+                self.logger.debug("Behalte '%s', da kein CAP-Datensatz vorliegt." % path_json)
+                continue
+
+            # Alte Alarmierungs-Files zur Löschung vormerken.
+            if alert.aid not in valid:
+                self.logger.info("Markiere '%s' zu Löschung, da Meldung aus Cache gelöscht wurde." % path_json)
+                files_remove.add(path_json)
+                continue
+
+            self.logger.debug("Behalte '%s', da Meldung noch gültig ist." % path_json)
+
+            # Die zugehörigen CAP-Files und Audio-Files einer gültigen Warnung
+            # behalten wir.
+            self.logger.debug("Behalte '%s'." % path_cap)
+            files_keep.add(path_cap)
+            if path_audio is not None:
+                self.logger.debug("Behalte '%s'." % path_audio)
+                files_keep.add(path_audio)
+
+        # Alle CAP- und Audio-Files bestimmen, die wir nicht behalten wollen.
+        dirs = { d for d in [ self.dir_cap, self.dir_audio ] if d is not None }
+        for d in dirs:
+            with os.scandir(d) as it:
+                for entry in it:
+                    if not entry.is_file():
                         continue
 
-                path_cap = os.path.join(self.dir_cap, "%s.xml" % darc_alert['id'])
-                sources_cap = []
-                if self.fetch_internet:
-                    sources_cap.extend(darc_alert['url']['xml']['internet'])
-                if self.fetch_hamnet:
-                    sources_cap.extend(darc_alert['url']['xml']['hamnet'])
+                    if entry.path not in files_keep:
+                        self.logger.info("Markiere '%s' zu Löschung." % entry.path)
+                        files_remove.add(entry.path)
 
-                if not self._fetch_file(path_cap, sources_cap):
-                    # Ohne CAP-Daten können wir nicht weiter arbeiten.
-                    self.logger.warning("Warnung '%s' kann nicht verarbeitet werden, da keine CAP-Daten vorliegen." % entry)
-                    continue
-
-                with open(path_cap) as f:
-                    capdata = xmltodict.parse(f.read())
-                capdata = capdata['alert']
-                del capdata['@xmlns']
-
-                if 'info' in capdata and not isinstance(capdata['info'], list):
-                    capdata['info'] = [ capdata['info'] ]
-                for i in capdata['info']:
-                    if 'resource' in i and not isinstance(i['resource'], list):
-                        i['resource'] = [ i['resource'] ]
-                    if 'area' in i and not isinstance(i['area'], list):
-                        i['area'] = [ i['area'] ]
-
-                alert = Alert(capdata)
-
-                if self.dir_audio is not None:
-                    path_audio = os.path.join(self.dir_audio, "%s.wav" % darc_alert['id'])
-                    sources_audio = []
-                    if self.fetch_internet:
-                        sources_audio.extend(darc_alert['url']['audio']['internet'])
-                    if self.fetch_hamnet:
-                        sources_audio.extend(darc_alert['url']['audio']['hamnet'])
-
-                    if self._fetch_file(path_audio, sources_audio):
-                        alert.attr_set('path_audio', path_audio)
-
-                yield alert
+        for path in files_remove:
+            self.logger.info("Lösche '%s'." % path)
+            os.unlink(path)
 
 
 
@@ -1401,6 +1476,14 @@ while True:
 
         # Cache aktualisieren
         CACHE.dump()
+
+        # Temporäre Daten der Quellen aufräumen
+        for s in SOURCES:
+            try:
+                s.purge(valid)
+            except Exception as e:
+                LOGGER.error("Fehler beim Aufräumen der Quelle '%s'" % s.stype)
+                LOGGER.exception(e)
 
         LOGGER.debug("Alarmierungsschleife abgearbeitet.")
 
