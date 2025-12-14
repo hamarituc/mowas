@@ -907,10 +907,6 @@ class Target:
                 if 'expires' in info and info['expires'] < t:
                     continue
 
-                # Meldungen verwerfen, die noch nicht aktiv sind
-                if 'onset' in info and info['onset'] >= t:
-                    continue
-
                 if 'area' not in info:
                     continue
 
