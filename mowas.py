@@ -1182,9 +1182,11 @@ class TargetAprs(Target):
                 call += pidx
 
             if infoidx is not None:
-                if not multiarea:
-                    call += '-'
-                call += '%d' % infoidx
+                infoidxnum = infoidx
+                infoidxstr = ""
+                while infoidxnum:
+                    infoidxstr = (chr(ord('A') + (infoidxnum % 26))) + infoidxstr
+                call += infoidxstr
 
             if len(call) > 9:
                 newcall = call[:9]
