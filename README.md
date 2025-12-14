@@ -851,3 +851,89 @@ target
 Mit `remote.host` und `remote.port` werden die Netzwerkadresse (Hostname oder
 IP-Adresse inkl. TCP-Port) des KISS-Modems angegeben. Die KISS-Parameter sind
 identisch zum seriellen KISS-Modem.
+
+
+Anwendungsbeispiel
+------------------
+
+### TCP-KISS-TNC mit Direwolf
+
+Mit Direwolf (https://github.com/wb2osz/direwolf) lässt sich ein einfaches
+Soundkarten-Modem als Test-Setup zum Einsatz bringen. Mit folgender
+Konfiguration wird Direwolf als TCP-KISS-Modem auf Port 8001 aktiv.
+
+```
+ADEVICE0 hw:0,0
+ARATE 48000
+ACHANNELS 1
+
+KISSPORT 8001
+
+CHANNEL 0
+MYCALL DB0XXX
+MODEM 1200
+```
+
+Direwolf kann interaktiv von der Shell getartet werden.
+
+```
+$ direwolf -c direwolf.conf
+Dire Wolf version 1.7
+Includes optional support for:  gpsd hamlib cm108-ptt dns-sd
+Warning: Could not open 'symbols-new.txt'.
+The "new" OVERLAID character information will not be available.
+
+Reading config file /etc/direwolf.conf
+Audio device for both receive and transmit: default  (channels 0 & 1)
+Channel 0: 1200 baud, AFSK 1200 & 2200 Hz, A+, 44100 sample rate.
+Channel 1: 1200 baud, AFSK 1200 & 2200 Hz, A+, 44100 sample rate.
+Note: PTT not configured for channel 0. (Ignore this if using VOX.)
+Note: PTT not configured for channel 1. (Ignore this if using VOX.)
+Ready to accept AGW client application 0 on port 8000 ...
+Ready to accept KISS TCP client application 0 on port 8001 ...
+DNS-SD: Avahi: Failed to create Avahi client: Daemon not running
+```
+
+Anschließend konfiguriert man das MoWaS-Tool wie folgt, um bundesweit alle
+Warnungen per APRS auszugeben. Die Ausgabe aller verfügbaren Warnungen sollte
+jedoch nur in einem Test-Setup erfolgen.
+
+```
+source:
+  bbk_url:
+    MOWAS:
+      url: 'https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json'
+
+cache:
+  path: 'cache/cache.json'
+
+target:
+  aprs_kiss_tcp:
+    DIREWOLF:
+      schedule:
+        10m: '1m'
+        1h: '5m'
+        1d: '10m'
+      filter:
+        geocodes:
+          - '0'
+      aprs:
+        mycall: 'DB0XXX'
+        beacon:
+          prefix: 'MOWA'
+        bulletin:
+          id: '0MOWA'
+      remote:
+        host: 'localhost'
+        port: 8001
+      kiss:
+        ports:
+          - 0
+```
+
+Startet man das MoWaS-Tool, sollte Direwolf nun binnen kürzester Zeit eine
+Reihe von Paketen über die Soundkarte ausgeben.
+
+```
+$ ./mowas.py -c mowas.yml
+```
