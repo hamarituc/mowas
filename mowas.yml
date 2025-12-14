@@ -31,23 +31,23 @@ cache:
 target:
   aprs_kiss_serial:
     DB0CSD:
+      schedule:
+        10m: '1m'
+        1h: '5m'
+        1d: '10m'
       filter:
         geocodes:
           - '145210000000'
           - '145220000000'
           - '145240000000'
           - '145000000000'
-      schedule:
-        10m: '1m'
-        60m: '5m'
-        1d: '10m'
       aprs:
         mycall: 'DB0CSD'
         digipath:
           - 'WIDE1-1'
           - 'WIDE2-2'
         beacon:
-          prefix: 'MW'
+          prefix: 'MWC'
         bulletin:
           mode: 'always'
           id: '0MOWAS'
