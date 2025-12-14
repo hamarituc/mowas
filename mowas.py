@@ -1373,6 +1373,7 @@ while True:
 
         LOGGER.debug("Alarmierungsschleife beginnt.")
 
+        # Alle Quellen abrufen
         for s in SOURCES:
             try:
                 for alert in s.fetch():
@@ -1381,10 +1382,16 @@ while True:
                 LOGGER.error("Fehler beim Abfragen der Quelle '%s'" % s.stype)
                 LOGGER.exception(e)
 
-        valid  = CACHE.purge()
+        # Veraltete Warnungen löschen
+        valid = CACHE.purge()
+
+        # IDs vergeben
         CACHE.persistent_ids()
+
+        # Zu alarmierende Warnungen abfragen
         alerts = CACHE.query()
 
+        # Alarmierung vornehmen
         for t in TARGETS:
             try:
                 t.alert(alerts)
@@ -1392,6 +1399,7 @@ while True:
                 LOGGER.error("Fehler bei der Alarmierung über Senke '%s/%s'" % ( t.ttype, t.tname ))
                 LOGGER.exception(e)
 
+        # Cache aktualisieren
         CACHE.dump()
 
         LOGGER.debug("Alarmierungsschleife abgearbeitet.")
