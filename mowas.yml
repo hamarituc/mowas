@@ -3,14 +3,14 @@ logging:
   console: true
 
 geodata:
-  path: 'mowas.gpkg'
+  path: 'geodata/mowas.gpkg'
 
 source:
   darc:
     DARC:
-      dir_json: 'darc/'
-      dir_cap: 'darc/'
-      dir_audio: 'darc/'
+      dir_json: 'cache/darc/'
+      dir_cap: 'cache/darc/'
+      dir_audio: 'cache/darc/'
       fetch_internet: true
       fetch_hamnet: false
   bbk_url:
@@ -26,7 +26,7 @@ source:
       url: 'https://warnung.bund.de/bbk.lhp/hochwassermeldungen.json'
 
 cache:
-  path: 'cache.json'
+  path: 'cache/cache.json'
 
 target:
   aprs_kiss_serial:
@@ -37,15 +37,15 @@ target:
         1d: '10m'
       filter:
         geocodes:
+          - '145110000000'
           - '145210000000'
           - '145220000000'
           - '145240000000'
-          - '145000000000'
+          - '160770000000'
       aprs:
         mycall: 'DB0CSD'
         digipath:
           - 'WIDE1-1'
-          - 'WIDE2-2'
         beacon:
           prefix: 'MWC'
         bulletin:
