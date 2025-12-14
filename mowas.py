@@ -622,7 +622,9 @@ class Cache:
         if alert.aid in self.alerts:
             self.alerts[alert.aid].update(alert)
         else:
-            self.alerts[alert.aid] = alert
+            thresh = datetime.datetime.now(datetime.timezone.utc) - self.age
+            if alert.capdata['sent'] >= thresh:
+                self.alerts[alert.aid] = alert
 
 
     def purge(self):
