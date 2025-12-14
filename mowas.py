@@ -1022,12 +1022,12 @@ class TargetAprs(Target):
                     if len(ringcoords) > 2:
                         if ringcoords[0] == '-1.0,-1.0' and ringcoords[1] == ringcoords[-1]:
                             ringcoords = ringcoords[1:]
-                            self.logger.info("Geometrie von Warnung '%s' enthält ungültige Koordinate `-1.0 -1.0`. Diese wurde entfernt, um die Geometrie zu reparieren." % alert.aid)
+                            self.logger.info("Warnung '%s': Geometrie enthält ungültige Koordinate `-1.0 -1.0`. Diese wurde entfernt, um die Geometrie zu reparieren." % alert.aid)
 
                     # Zur Sicherheit prüfen wir, ob die Ringe geschlossen sind.
                     # Wir könnten sie alternativ auch schließen.
                     if ringcoords[0] != ringcoords[-1]:
-                        self.logger.error("Geometrie von Warnung '%s' hat nicht geschlossen Polygonringe. Diese Gebieter werden verworfen." % alert.aid)
+                        self.logger.error("Warnung '%s': Geometrie hat nicht geschlossen Polygonringe. Diese Gebieter werden verworfen." % alert.aid)
                         continue
 
                     for coords in ringcoords:
@@ -1045,7 +1045,7 @@ class TargetAprs(Target):
                 for geocode in area['geocode']:
                     arsmultipolygon = GEODATA.ars_get(geocode['value'])
                     if arsmultipolygon is None:
-                        self.logger.warning("Gebietsschlüssel '%s' (%s) nicht in Polygon auflösbar." % ( geocode['value'], geocode['valueName'] ))
+                        self.logger.warning("Warnung '%s': Gebietsschlüssel '%s' (%s) nicht in Polygon auflösbar." % ( alert.aid, geocode['value'], geocode['valueName'] ))
                     else:
                         for i in range(arsmultipolygon.GetGeometryCount()):
                             polys.append(arsmultipolygon.GetGeometryRef(i))
@@ -1134,7 +1134,7 @@ class TargetAprs(Target):
         return comment
 
 
-    def _get_bulletin(self, pos, comment):
+    def _get_bulletin(self, alert, pos, comment):
         if self.bulletin_mode == 'never':
             # Generell auf Bulletins verzichten.
             return []
@@ -1145,14 +1145,15 @@ class TargetAprs(Target):
 
         # Ohne Meldungstext gibt es nichts zu warnen.
         if comment is None:
+            self.logger.warning("Warnung '%s': Kein Kommentar. Es wird kein APRS-Bulletins ausgegeben." % alert.aid)
             return []
 
         # Zu lange Meldungen bei Bedarf einkürzen.
         if len(comment) > 67:
-            self.logger.warning("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Bulletins." % comment)
+            self.logger.warning("Warnung '%s': Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Bulletins." % ( alert.aid, comment ))
             if self.truncate:
                 comment = comment[0:64]
-                self.logger.info("Kürze auf '%s'." % comment)
+                self.logger.info("Warnung '%s': Kürze auf '%s'." % ( alert.aid, comment ))
                 comment += "..."
 
         packet = (':BLN%s:' % self.bulletin_id) + comment.replace('|', '').replace('~', '')
@@ -1167,7 +1168,7 @@ class TargetAprs(Target):
         return [ frame ]
 
 
-    def _get_beacon(self, pids, cancel, infoidx, symbol, pos, time, comment):
+    def _get_beacon(self, alert, pids, cancel, infoidx, symbol, pos, time, comment):
         multiarea = len(pos) > 1
 
         calls = []
@@ -1195,7 +1196,7 @@ class TargetAprs(Target):
 
             if len(call) > 9:
                 newcall = call[:9]
-                self.logger.warning("APRS-Objektbezeichnung '%s' zu lang. Kürze auf '%s'." % ( call, newcall ))
+                self.logger.warning("Warnung '%s': APRS-Objektbezeichnung '%s' zu lang. Kürze auf '%s'." % ( alert.aid, call, newcall ))
                 call = newcall
 
             lat = (p.GetY() +  90.0) % 180 -  90.0
@@ -1244,10 +1245,10 @@ class TargetAprs(Target):
             # TODO: Bei Area-Baken sind es max 36 Zeichen.
             max_comment = 43
             if len(comment) > max_comment:
-                self.logger.warning("Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Baken." % comment)
+                self.logger.warning("Warnung '%s': Kommentar '%s' überschreitet die Längenbegrenzung von APRS-Baken." % ( alert.aid, comment ))
                 if self.truncate:
                     comment = comment[0:max_comment - 3]
-                    self.logger.info("Kürze auf '%s'." % comment)
+                    self.logger.info("Warnung '%s': Kürze auf '%s'." % ( alert.aid, comment ))
                     comment += "..."
 
             packet += comment
@@ -1286,8 +1287,8 @@ class TargetAprs(Target):
                 time = self._get_time(info, capdata, t)
                 comment = self._get_comment(info)
 
-                frames.extend(self._get_bulletin(pos, comment))
-                frames.extend(self._get_beacon(pids, cancel, infoidx if multiinfo else None, symbol, pos, time, comment))
+                frames.extend(self._get_bulletin(alert, pos, comment))
+                frames.extend(self._get_beacon(alert, pids, cancel, infoidx if multiinfo else None, symbol, pos, time, comment))
 
         self.send(frames)
 
