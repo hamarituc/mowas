@@ -1339,7 +1339,7 @@ class TargetAprs(Target):
 
 
     def send(self, alerts):
-        pass
+        raise NotImplemented("Für den Treiber '%s' ist keine Alarmierungsroutine implementiert." % self.ttype)
 
 
 
@@ -1537,14 +1537,19 @@ while True:
                 LOGGER.error("Fehler beim Abfragen der Quelle '%s'" % s.stype)
                 LOGGER.exception(e)
 
-        # Veraltete Warnungen löschen
-        valid = CACHE.purge()
+        try:
+            # Veraltete Warnungen löschen
+            valid = CACHE.purge()
 
-        # IDs vergeben
-        CACHE.persistent_ids()
+            # IDs vergeben
+            CACHE.persistent_ids()
 
-        # Zu alarmierende Warnungen abfragen
-        alerts = CACHE.query()
+            # Zu alarmierende Warnungen abfragen
+            alerts = CACHE.query()
+        except Exception as e:
+            LOGGER.error("Fehler bei der Verarbeitung aktueller Warnungen")
+            LOGGER.exception(e)
+            continue
 
         # Alarmierung vornehmen
         for t in TARGETS:
@@ -1554,8 +1559,12 @@ while True:
                 LOGGER.error("Fehler bei der Alarmierung über Senke '%s/%s'" % ( t.ttype, t.tname ))
                 LOGGER.exception(e)
 
-        # Cache aktualisieren
-        CACHE.dump()
+        try:
+            # Cache aktualisieren
+            CACHE.dump()
+        except Exception as e:
+            LOGGER.error("Fehler beim Aufräumen des Caches")
+            LOGGER.exception(e)
 
         # Temporäre Daten der Quellen aufräumen
         for s in SOURCES:
