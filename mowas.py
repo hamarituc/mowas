@@ -861,14 +861,14 @@ class TargetAprs(Target):
         self.dstcall           = config_aprs.get_str('dstcall', 'APMOWA')
         self.mycall            = config_aprs.get_str('mycall')
         self.digipath          = config_aprs.get_list('digipath', [ 'WIDE1-1' ])
-        self.max_areas         = config_aprs.get_int('max_areas', 0)
         self.truncate          = config_aprs.get_bool('truncate_comment', True)
         self.beacon            = config_beacon.get_bool('enabled', True)
         self.beacon_prefix     = config_beacon.get_str('prefix', 'MOWA')
         self.beacon_time       = config_beacon.get_bool('time', True)
         self.beacon_compressed = config_beacon.get_bool('compressed', False)
-        self.bulletin_id       = config_bulletin.get_str('id', '0MOWAS')[0:6].ljust(6, ' ')
+        self.max_areas         = config_beacon.get_int('max_areas', 0)
         self.bulletin_mode     = config_bulletin.get_str('mode', 'fallback').lower()
+        self.bulletin_id       = config_bulletin.get_str('id', '0MOWAS')[0:6].ljust(6, ' ')
 
         if self.bulletin_mode not in [ 'never', 'fallback', 'always' ]:
             self.logger.warning("Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück." % self.bulletin_mode)
