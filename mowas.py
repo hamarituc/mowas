@@ -1269,6 +1269,7 @@ class TargetAprs(Target):
         t = datetime.datetime.now(datetime.timezone.utc)
 
         frames = []
+        alerts_send = []
         for alert, capdata in self.query(alerts, t):
             pids = alert.attr_get('pids')
             multiinfo = len(capdata['info']) > 1
@@ -1290,7 +1291,13 @@ class TargetAprs(Target):
                 frames.extend(self._get_bulletin(alert, pos, comment))
                 frames.extend(self._get_beacon(alert, pids, cancel, infoidx if multiinfo else None, symbol, pos, time, comment))
 
+            alerts_send.append(alert)
+
+        # Alle Frames auf einmal senden
         self.send(frames)
+
+        for alert in alerts_send:
+            alert.tx_done(self.ttype, self.tname, t)
 
 
     def send(self, alerts):
