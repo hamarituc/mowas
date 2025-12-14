@@ -877,6 +877,7 @@ class Target:
         self.tname = tname
         self.logger = logging.getLogger('mowas.target.%s.%s' % ( self.ttype, self.tname ))
 
+        self.sched = Schedule(config.get_subtree('schedule', "Ungültiger Widerholungsrhythmus für Senke '%s/%s'" % ( self.ttype, self.tname )))
         self.filter = Filter(config.get_subtree('filter', "Ungültige Filter-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), True), self.logger)
 
 
@@ -887,6 +888,11 @@ class Target:
             # leer war. Wir vermeiden es somit, veraltete Warnungen erneut zu
             # auszulösen.
             if not self.filter.match_age(alert, self.ttype, self.tname, t):
+                continue
+
+            # Nachrichten nur wiederholen, wenn es das Wiederholungsintervall
+            # verlangt.
+            if not self.sched.tx_required(alert, self.ttype, self.tname, t):
                 continue
 
             capdata = copy.deepcopy(alert.capdata)
@@ -941,8 +947,6 @@ class TargetAprs(Target):
     def __init__(self, tname, config):
         super().__init__(tname, config)
 
-        self.sched = Schedule(config.get_subtree('schedule', "Ungültiger Widerholungsrhythmus für Senke '%s/%s'" % ( self.ttype, self.tname )))
-
         config_aprs     = config.get_subtree('aprs', "Ungültige APRS-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
         config_beacon   = config_aprs.get_subtree('beacon', "Ungültige Baken-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), optional = True)
         config_bulletin = config_aprs.get_subtree('bulletin', "Ungültige Bulletin-Konfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ), optional = True)
@@ -962,16 +966,6 @@ class TargetAprs(Target):
         if self.bulletin_mode not in [ 'never', 'fallback', 'always' ]:
             self.logger.warning("Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück." % self.bulletin_mode)
             self.bulletin_mode = 'fallback'
-
-
-    def query(self, alerts, t):
-        for alert, capdata in super().query(alerts, t):
-            # Nachrichten nur wiederholen, wenn es das Wiederholungsintervall
-            # verlangt.
-            if not self.sched.tx_required(alert, self.ttype, self.tname, t):
-                continue
-
-            yield alert, capdata
 
 
     #
