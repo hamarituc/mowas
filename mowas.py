@@ -716,7 +716,7 @@ class Cache:
 
             nopids = nopids_new
 
-        if aid in nopids.keys():
+        for aid in nopids.keys():
             self.logger.error("Warnung '%s' ist Bestandteil eines zirkulären Verweises." % aid)
             # TODO: einzelne IDs vergeben?
 
