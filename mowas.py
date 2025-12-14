@@ -1381,6 +1381,9 @@ class TargetAprsKissSerial(TargetAprsKiss):
 
 
     def send(self, frames):
+        if len(frames) == 0:
+            return
+
         kissdata = super().send(frames)
 
         with serial.Serial(self.serial_device, self.serial_baud) as conn:
@@ -1404,6 +1407,9 @@ class TargetAprsKissTcp(TargetAprsKiss):
 
 
     def send(self, frames):
+        if len(frames) == 0:
+            return
+
         kissdata = super().send(frames)
 
         try:
