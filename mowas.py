@@ -632,6 +632,7 @@ class Cache:
                 remove.discard(ref_aid)
 
         for aid in remove:
+            self.logger.info("Lösche Warnung '%s' aus Cache." % aid)
             del self.alerts[aid]
 
         return valid
