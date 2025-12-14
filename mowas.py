@@ -364,7 +364,7 @@ class SourceDARC(Source):
                 self.logger.exception(e)
                 continue
 
-            self.logger.debug("Download von '%s' erfolgreich.")
+            self.logger.debug("Download von '%s' erfolgreich." % url)
             with open(path, 'wb') as f:
                 f.write(r.content)
 
@@ -628,7 +628,7 @@ class Cache:
                 for ref_aid in refs[aid]:
                     pid |= set(pids[ref_aid])
 
-                # Sollte es keine refernzierten Warnungen geben, vergeben wir
+                # Sollte es keine referenzierten Warnungen geben, vergeben wir
                 # eine neue Persistent-ID. Es wird bei 1 beginnend eine nicht
                 # belegte ID nach First Fit gesucht.
                 pid = sorted(pid)
@@ -1090,7 +1090,7 @@ class TargetAprs(Target):
             # Wir benutzen nur die erste Persistent-ID um die Airtime gering zu
             # halten. Ggf. können wir überlegen, ob wir die Meldung für alle
             # Persistent-IDs übertragen oder alle APRS-Objekte bis auf das
-            # erste caceln.
+            # erste canceln.
             break
 
         frames = []
