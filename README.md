@@ -502,7 +502,7 @@ diesem Grund ergibt es Sinn, Warnungen regelmäßig zu wiederholen. Im Abschnitt
 einem Beispiel deutlich.
 
 ```yaml
-target
+target:
   TYP:
     NAME:
       schedule:
@@ -535,7 +535,7 @@ die Möglichkeit die Warnungen sowohl räumlich als auch örtlich zu filtern. De
 Filter wird in einem eigenen Abschnitt `filter` definiert.
 
 ```yaml
-target
+target:
   TYP:
     NAME:
       filter:
@@ -572,7 +572,7 @@ der Warnung. Der Wiederholungsrhythmus wird dadurch nicht eingeschränkt.
 Beispiel:
 
 ```yaml
-target
+target:
   TYP:
     NAME:
       filter:
@@ -628,7 +628,7 @@ wieder hierarchisch aufgebaut. Im folgenden Beispiel besitzt die Einstellung
 
 
 ```yaml
-target
+target:
   TYP:
     NAME:
       aprs:
@@ -672,7 +672,7 @@ sollen. Mit `WIDE1-1` wird jedes Paket genau einmal wiederholt. Die Einstellung
 muss stets als Liste angegeben werden.
 
 ```yaml
-target
+target:
   TYP:
     NAME:
       aprs:
@@ -684,7 +684,7 @@ Mit dem Digipath `WIDE1-1,WIDE2-2` würde jedes Paket bis zu drei mal wiederholt
 werden. Die Einstellung wäre wie folgt zu kodieren.
 
 ```yaml
-target
+target:
   TYP:
     NAME:
       aprs:
@@ -769,7 +769,7 @@ verbunden sein.
 Die Konfiguration erfolgt in Ergänzung der allgemeinen Einstellungen wie folgt.
 
 ```yaml
-target
+target:
   aprs_kiss_serial:
     NAME:
       # Allgemeine Einstellungen
@@ -815,7 +815,7 @@ I.d.R. ist dies notwendig, um ein TNC in den KISS-Modus zu versetzen. Mit
 folgender Konfiguration, wird ein SCS DSP-TNC initialisiert.
 
 ```yaml
-target
+target:
   aprs_kiss_serial:
     NAME:
       serial:
@@ -837,7 +837,7 @@ Die Konfiguration erfolgt in Ergänzung der allgemeinen Einstellungen wie folgt.
 
 
 ```yaml
-target
+target:
   aprs_kiss_tnc:
     NAME:
       remote:
@@ -898,7 +898,7 @@ Anschließend konfiguriert man das MoWaS-Tool wie folgt, um bundesweit alle
 Warnungen per APRS auszugeben. Die Ausgabe aller verfügbaren Warnungen sollte
 jedoch nur in einem Test-Setup erfolgen.
 
-```
+```yaml
 source:
   bbk_url:
     MOWAS:
