@@ -1,0 +1,7 @@
+aioax25
+gdal==3.9.*
+pytz
+requests
+pyserial
+xmltodict
+PyYAML

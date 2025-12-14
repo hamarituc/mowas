@@ -42,6 +42,165 @@ Folgende Senken stehen zur Verfügung:
  - geplant: Sprachansagen auf SVXlink-Relais
 
 
+Installation
+------------
+
+Zum Betrieb ist nur das Skript `mowas.py` notwendig. Das Skript
+`mowas-geodata.py` wird nur einmal zur Aufbereitung von Geodaten benötigt.
+Zweckmäßiger Weise installiert man beide Skript als ausfühbare Dateien nach
+`/usr/bin/` bzw. `/usr/local/bin`.
+
+```
+# cp mowas.py /usr/local/bin
+# cp mowas-geodata.py /usr/local/bin
+```
+
+Die Skripte erfordern die in `requirements.txt` aufgeführten Python-Pakete.
+Stehen diese nicht allesamt über die Distribution zur Verfügung, kann man
+alternativ wie folgt eine virtuelle Python-Umgebung einrichten, z.B. unter
+`/opt/mowas`. Jedes andere Verzeichnis ist aber ebenfalls dafür geeignet.
+
+```
+# python -m venv /opt/mowas
+# source /opt/mowas/bin/active
+# pip install -U -r requirements.txt
+```
+
+Mit dem `source`-Befehl wird die Python-Umgebung betreten. Will man das Skript
+ohne vorherigen `source`-Befehl aufrufen, muss man stattdessen folgenden
+Befehl verwenden.
+
+```
+$ /opt/mowas/bin/python ./mowas.py
+```
+
+Weiterhin werden noch Datenverzeichnis benötigt. Die Geodaten werden unter
+`/usr/share/mowas/` abgelegt.
+
+```
+# mkdir /usr/share/mowas
+# mkdir /usr/share/mowas/geodata
+# ./mowas-geodata.py -i DE_VG5000.gpkg -o /usr/share/mowas/geodata/mowas.gpkg
+```
+
+Die Quelldaten, lassen sich über https://gdz.bkg.bund.de/index.php/default/verwaltungsgebiete-1-5-000-000-stand-01-01-vg5000-01-01.html
+herunterladen. Für die genauen Hintergründe sei auf den Abschnitt
+[Geodaten](#geodata) verwiesen.
+
+Temporäre Daten sollten unter `/var/cache/mowas` abgelegt werden.
+
+```
+# mkdir /var/cache/mowas
+# mkdir /var/cache/mowas/darc
+```
+
+Die Konfiguration muss unter `/etc/mowas.yml` angelegt werden. Eine
+beispielhafte Konfiguration sieht wie folgt aus. Es werden die
+DARC-Warn-Schnittelle und die öffentlichen Warndatensätze des BBK angebunden
+und für den Bereich um die Stadt Chemnitz per APRS-Baken gewarnt.
+
+```yaml
+logging:
+  level: 'INFO'
+  file: '/var/log/mowas.log'
+  console: true
+
+geodata:
+  path: '/usr/share/mowas/geodata/mowas.gpkg'
+
+cache:
+  path: '/var/cache/mowas/cache.json'
+
+source:
+  darc:
+    DARC:
+      dir_json: '/var/cache/mowas/darc/'
+      dir_cap: '/var/cache/mowas/darc/'
+      dir_audio: '/var/cache/mowas/darc/'
+      fetch_internet: true
+      fetch_hamnet: false
+  bbk_url:
+    MOWAS:
+      url: 'https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json'
+    KATWARN:
+      url: 'https://warnung.bund.de/bbk.katwarn/warnmeldungen.json'
+    BIWAP:
+      url: 'https://warnung.bund.de/bbk.biwapp/warnmeldungen.json'
+    DWD:
+      url: 'https://warnung.bund.de/bbk.dwd/unwetter.json'
+    LHP:
+      url: 'https://warnung.bund.de/bbk.lhp/hochwassermeldungen.json'
+
+target:
+  aprs_kiss_tcp:
+    DB0CSD:
+      schedule:
+        10m: '1m'
+        1h: '5m'
+        1d: '10m'
+      filter:
+        geocodes:
+          - '145210000000'
+          - '145220000000'
+          - '145240000000'
+      aprs:
+        mycall: 'DB0CSD'
+        digipath:
+          - 'WIDE1-1'
+        truncate_comment: true
+        beacon:
+          prefix: 'MWC'
+        bulletin:
+          id: '0MWC'
+      remote:
+        host: 'localhost'
+        port: 8001
+      kiss:
+        ports:
+          - 0
+```
+
+Eine detaillierte Beschreibung aller Einstellmöglichkeiten folgt weiter unten.
+
+Damit der Dienst im Hintergrund ausgeführt wird, kann unter
+`/etc/systemd/system/mowas.service` eine systemd-Unit angelegt werden.
+
+```
+[Unit]
+Description=MoWaS-Alarmierung
+
+[Service]
+ExecStart=/usr/local/bin/station.py
+# alternativ: ExecStart=/opt/mowas/bin/python /usr/local/bin/station.py
+Type=exec
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Diese muss dann beim Hochfahren nur noch automatisch gestartet werden.
+
+```
+# systemctl daemon-reload
+# systemctl enable mowas
+# systemctl start mowas
+```
+
+Für das Logfile `/var/log/mowas.log` empfiehlt es sich unter `/etc/lograte.d/mowas`
+eine entsprechende Regel einzurichten, die alte Logdaten rotiert.
+
+```
+/var/log/mowas.log {
+	copytruncate
+	rotate 31
+	daily
+	compress
+	missingok
+	notifempty
+}
+```
+
+
 Allgemeine Konfiguration
 ------------------------
 
@@ -116,8 +275,8 @@ veröffentlicht. Mit dem Programm `mowas-geodata.py` kann für jedes
 Verwaltungsgebiet eine Referenzposition abgeleitet werden.
 
 ```
-$ ./mowas-geodata.py -i geodata/DE_VG5000.gpkg -o mowas.gpkg
-Lade 'geodata/DE_VG5000.gpkg'.
+$ ./mowas-geodata.py -i DE_VG5000.gpkg -o mowas.gpkg
+Lade 'DE_VG5000.gpkg'.
   Lade Layer 'vg5000_sta'.
     1 Regionen mit 1 Features geladen.
   Lade Layer 'vg5000_lan'.
