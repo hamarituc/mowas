@@ -860,14 +860,15 @@ class Schedule:
 
         diff = last - first
 
-        # Alle vorausliegenden Übertragungszeitpunkt berechnen
+        # Alle vorausliegenden Übertragungszeitpunkte berechnen
         diffs = [ d for d in self.sched if d > diff ]
 
         # Alle Übertragungen wurden abgeschlossen
         if len(diffs) == 0:
             return False
 
-        return first + diffs[0] <= t
+        # Wir sehen einen Jitter-Puffer von 5 Sekunden vor.
+        return first + diffs[0] <= t + datetime.timedelta(seconds = 5)
 
 
 
