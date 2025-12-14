@@ -292,8 +292,8 @@ class Alert:
 
 
     def cache_load(self, data):
-        self.attrs   = data['attrs']
-        self.txstate = data['txstate']
+        self.attrs   = data.get('attrs', {})
+        self.txstate = data.get('txstate', {})
 
         for ttype, tdata in self.txstate.items():
             for tname, txdata in tdata.items():
