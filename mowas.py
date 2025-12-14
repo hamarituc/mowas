@@ -11,6 +11,7 @@ from aioax25.aprs.position import APRSCompressedCoordinates
 from aioax25.aprs.symbol import APRSSymbol
 from aioax25.frame import AX25Address
 import argparse
+import binascii
 import copy
 import datetime
 import json
@@ -150,6 +151,19 @@ class Config:
             return value
         if not isinstance(value, str):
             raise ConfigException("Ungültiges Attribut '%s': String erwartet." % key)
+        return value
+
+
+    def get_bin(self, key, default = None, null = False):
+        value = self.get_str(key, default, null)
+        if value is None:
+            return None
+
+        try:
+            value = binascii.unhexlify(value)
+        except binascii.Error as e:
+            raise ConfigException("Ungültiges Attribut '%s': %s." % ( key, e.args[0] ))
+
         return value
 
 
@@ -1343,13 +1357,28 @@ class TargetAprsKissSerial(TargetAprsKiss):
 
         self.serial_device = config_serial.get_str('device')
         self.serial_baud   = config_serial.get_int('baud', 115200)
+        self.cmd_up        = config_serial.get_bin('cmd_up', '')
+        self.cmd_down      = config_serial.get_bin('cmd_down', '')
+        self.cmd_pre       = config_serial.get_bin('cmd_pre', '')
+        self.cmd_post      = config_serial.get_bin('cmd_post', '')
+
+        with serial.Serial(self.serial_device, self.serial_baud) as conn:
+            conn.write(self.cmd_up)
+
+
+    def __del__(self):
+        if hasattr(self, 'cmd_down'):
+            with serial.Serial(self.serial_device, self.serial_baud) as conn:
+                conn.write(self.cmd_down)
 
 
     def send(self, frames):
         kissdata = super().send(frames)
 
-        with serial.Serial(self.serial_device, self.serial_baud) as kissconn:
-            kissconn.write(kissdata)
+        with serial.Serial(self.serial_device, self.serial_baud) as conn:
+            conn.write(self.cmd_pre)
+            conn.write(kissdata)
+            conn.write(self.cmd_post)
 
 
 

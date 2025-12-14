@@ -617,6 +617,10 @@ target
       serial:
         device: '/dev/ttyUSB0'
         baud: 115200
+        cmd_up: ''
+        cmd_down: ''
+        cmd_pre: ''
+        cmd_post: ''
       kiss:
         ports:
           - 0
@@ -624,16 +628,44 @@ target
 
 Folgende Parameter stehen zur Verfügung
 
-| Einstellung     | Typ              | Standardwert   | Bedeutung |
-|:--------------- | ---------------- | -------------- |:--------- |
-| `serial.device` | String           | *erforderlich* | Positionsmeldungen senden |
-| `serial.baud`   | Zahl             | 115200         | Präfix für die Objektkennung von Positionsmeldungen |
-| `kiss.ports`    | Liste von Zahlen | leer           | Zeitstempel in der Positionsmeldung kodieren |
+| Einstellung       | Typ              | Standardwert   | Bedeutung |
+|:----------------- | ---------------- | -------------- |:--------- |
+| `serial.device`   | String           | *erforderlich* | Positionsmeldungen senden |
+| `serial.baud`     | Zahl             | 115200         | Präfix für die Objektkennung von Positionsmeldungen |
+| `serial.cmd_up`   | Binär-String     | leer           | Kommando, welches zur Initialisierung an das TNC geschickt wird |
+| `serial.cmd_down` | Binär-String     | leer           | Kommando, welches beim Beenden an das TNC geschickt wird |
+| `serial.cmd_pre`  | Binär-String     | leer           | Kommando, welches vor einem Sendezyklus an das TNC geschickt wird |
+| `serial.cmd_post` | Binär-String     | leer           | Kommando, welches nach einem Sendezyklus an das TNC geschickt wird |
+| `kiss.ports`      | Liste von Zahlen | leer           | Zeitstempel in der Positionsmeldung kodieren |
 
 Mit `serial.device` und `serial.baud` werden die Schnittstellenparameter des
 KISS-Modems angegeben. Jedes KISS-Moden kann mehrere Ports ansteuern. Diese
 sind mit Zahlen bei 0 beginnend durchnummiert. In der Liste `kiss.ports` wird
 angegeben, welche Ports mit Daten bespielt werden sollen.
+
+Ggf. muss das Modem zunächst initialisiert werden. Mit den `cmd`-Parametern
+können Kommandos in Hexadezimalschreibweise konfiguriert werden, die zu
+bestimmten Zeitpunkten ausgeführt werden.
+
+ * `serial.cmd_up` → einmalig bei Initialisierung der Software
+ * `serial.cmd_down` → einmalig bei Beendigung der Software
+ * `serial.cmd_pre` → vor einem Sendezyklus
+ * `serial.cmd_post` → nach einem Sendezyklus
+
+I.d.R. ist dies notwendig, um ein TNC in den KISS-Modus zu versetzen. Mit
+folgender Konfiguration, wird ein SCS DSP-TNC initialisiert.
+
+```yaml
+target
+  aprs_kiss_serial:
+    NAME:
+      serial:
+        cmd_up: '1b404b0d'
+        cmd_down: 'dbdbc0ffc0'
+```
+
+`cmd_up` stellt sicher, dass das TNC in den KISS-Modus wechselt. Mit `cmd_down`
+wird der KISS-Modus verlassen.
 
 #### TCP-KISS-TNC
 
