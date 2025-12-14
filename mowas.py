@@ -694,11 +694,16 @@ class Cache:
             rerun = False
             nopids_new = {}
             for aid, alert in nopids.items():
+                # Wir berechnen die Menge aller Referenzen von `aid`, die noch
+                # keine Persistent-ID haben. Dann können wir auch für `aid`
+                # noch keine Persistent-ID vergeben und merken und diese
+                # Warnung für den nächsten Durchlauf.
                 if refs[aid] - set(pids.keys()):
                     nopids_new[aid] = alert
                     continue
 
-                # Die Persistent-IDs aller referenzierten Warnungen vereinigen
+                # Die Warnung `aid` erhält alle Persistent-IDs der Warnungen,
+                # auf die sie referenziert.
                 pid = set()
                 for ref_aid in refs[aid]:
                     pid |= set(pids[ref_aid])
@@ -710,10 +715,18 @@ class Cache:
                 if len(pid) == 0:
                     pid = [ freepids.pop(0) ]
 
+                # Persistent-IDs zuweisen
                 pids[aid] = pid
                 alert.attr_set('pids', pid)
+
+                # Da wir neue Persistent-IDs vergeben haben, können weitrere
+                # Nachrichten, die ggf. auf `aid` verweisen, mit einer
+                # Persistent-ID versehen werden. Es muss also ein weiterer
+                # Durchlauf erfolgen.
                 rerun = True
 
+            # Noch nicht mit einer Persistent-ID versehene Warnungen für den
+            # nächsten Durchlauf vormerken.
             nopids = nopids_new
 
         for aid in nopids.keys():
