@@ -410,6 +410,22 @@ class SourceDARC(Source):
         return Alert(capdata)
 
 
+    def _safe_filename(self, filename):
+        # Dateinamen werden ggf. aus extern geladenen Daten abgeleitet. Auf
+        # diese Weise verhindern wir, dass eine nicht vertrauenswürdige Quelle
+        # beliebig im Dateisystem navigiert.
+        return filename.replace('/', '_')
+
+    def _path_cap(self, aid):
+        return os.path.join(self.dir_cap, self._safe_filename("%s.xml" % aid))
+
+    def _path_audio(self, aid):
+        if self.dir_audio is None:
+            return None
+
+        return os.path.join(self.dir_audio, self._safe_filename("%s.wav" % aid))
+
+
     def _fetch_file(self, path, urls):
         # Nichts tun, wenn File bereits existiert
         if os.path.isfile(path):
@@ -441,7 +457,9 @@ class SourceDARC(Source):
 
     def fetch(self):
         for path_json, darc_alert in self._read_alert():
-            path_cap = os.path.join(self.dir_cap, "%s.xml" % darc_alert['id'])
+            path_cap = self._path_cap(darc_alert['id'])
+            path_audio = self._path_audio(darc_alert['id'])
+
             sources_cap = []
             if self.fetch_internet:
                 sources_cap.extend(darc_alert['url']['xml']['internet'])
@@ -455,8 +473,7 @@ class SourceDARC(Source):
 
             alert = self._read_cap(path_cap)
 
-            if self.dir_audio is not None:
-                path_audio = os.path.join(self.dir_audio, "%s.wav" % darc_alert['id'])
+            if path_audio is not None:
                 sources_audio = []
                 if self.fetch_internet:
                     sources_audio.extend(darc_alert['url']['audio']['internet'])
@@ -477,12 +494,8 @@ class SourceDARC(Source):
 
         # Alle Files einlesen
         for path_json, darc_alert in self._read_alert():
-            path_cap = os.path.join(self.dir_cap, "%s.xml" % darc_alert['id'])
-
-            if self.dir_audio is not None:
-                path_audio = os.path.join(self.dir_audio, "%s.wav" % darc_alert['id'])
-            else:
-                path_audio = None
+            path_cap = self._path_cap(darc_alert['id'])
+            path_audio = self._path_audio(darc_alert['id'])
 
             alert = self._read_cap(path_cap)
 
