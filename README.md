@@ -31,7 +31,7 @@ Folgende Warnquellen stehen zur Verfügung.
    (https://mowas.notfunk.radio/)
 
 Warnungen aus unterschiedlichen Quellen, die die gleiche CAP-Kennung haben,
-werden als eine Warnung betrachtet. Es ist also Möglichkeit mehrere Quellen
+werden als eine Warnung betrachtet. Es ist also möglich mehrere Quellen
 anzubinden ohne Gefahr zu laufen, Warnungen mehrfach auszugeben.
 
 Folgende Senken stehen zur Verfügung:
