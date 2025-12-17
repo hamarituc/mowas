@@ -38,7 +38,7 @@ Folgende Senken stehen zur Verfügung:
 
  - APRS-Meldungen per KISS-TNC über eine serielle Schnittstelle
  - APRS-Meldungen per KISS-TNS über eine TCP-Verbindung
- - geplant: APRS-Meldungen per Telnet-Protokoll
+ - APRS-Meldungen per Telnet-Protokoll
  - geplant: Sprachansagen auf SVXlink-Relais
 
 
@@ -866,6 +866,45 @@ Folgende Parameter stehen zur Verfügung
 Mit `remote.host` und `remote.port` werden die Netzwerkadresse (Hostname oder
 IP-Adresse inkl. TCP-Port) des KISS-Modems angegeben. Die KISS-Parameter sind
 identisch zum seriellen KISS-Modem.
+
+#### Telnet
+
+Mit dem Telnet-Treiber ist eine direkte Anbindung an das APRS-IS-Netzwerk
+möglich. Der Treibername lautet `aprs_telnet`.
+
+Die Konfiguration erfolgt in Ergänzung der allgemeinen Einstellungen wie folgt.
+
+```yaml
+target:
+  aprs_telnet:
+    NAME:
+      remote:
+        host: 'euro.aprs2.net'
+        user: '...'
+        pass: '...'
+```
+
+Folgende Parameter stehen zur Verfügung
+
+| Einstellung   | Typ    | Standardwert   | Bedeutung |
+|:------------- | ------ | -------------- |:--------- |
+| `remote.host` | String | *erforderlich* | Hostname des APRS-Servers |
+| `remote.port` | Zahl   | 14580          | TCP-Port des APRS-Servers |
+| `remote.user` | String | *erforderlich* | Nutzername für die Anmeldung am Server |
+| `remote.pass` | String | leer           | Nutzerabhängigker Pass-Code für die Anmeldung am Server |
+
+Mit `remote.host` und `remote.port` werden die Netzwerkadresse (Hostname oder
+IP-Adresse inkl. TCP-Port) des APRS-Server angegeben. Öffentlich Server sind
+unter https://www.aprs2.net/ aufgeführt. Für Deutschland empfiehlt sich
+`euro.aprs2.net` als Einstiegspunkt.
+
+APRS-Server erfordern eine Anmeldung mit Nutzernamen (`remote.user`) und einem
+optionalen Pass-Code (`remote.pass`). Als Nutzername wird das Rufzeichen der
+einliefernden Amateurfunkstelle verwendet. Der Pass-Code dient zum Nachweis,
+dass man Funkamateur ist. Server verlangen ihn in aller Regel, wenn man Pakete
+einliefern will. Er berechnet sich statisch aus dem Nutzernamen (siehe z.B.
+https://apps.magicbug.co.uk/passcode/) und stellt keinen harten
+Sicherheitsmechanismus dar.
 
 
 Anwendungsbeispiel

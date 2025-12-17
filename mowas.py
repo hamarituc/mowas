@@ -1440,6 +1440,58 @@ class TargetAprsKissTcp(TargetAprsKiss):
 
 
 
+class TargetAprsTelnet(TargetAprs):
+    ttype = 'aprs_telnet'
+
+
+    def __init__(self, tname, config):
+        super().__init__(tname, config)
+
+        config_remote = config.get_subtree('remote', "Ungültige Verbindungskonfiguration für Senke '%s/%s'" % ( self.ttype, self.tname ))
+
+        self.remote_host = config_remote.get_str('host')
+        self.remote_port = config_remote.get_int('port', 14580)
+        self.remote_user = config_remote.get_str('user')
+        self.remote_pass = config_remote.get_str('pass', None, null = True)
+
+        self.remote_user = self.remote_user.replace(" ", "")
+        if self.remote_pass is not None:
+            self.remote_pass = self.remote_pass.replace(" ", "")
+
+
+    def send(self, frames):
+        if len(frames) == 0:
+            return
+
+        connectstr = "user %s" % self.remote_user
+        if self.remote_pass is not None:
+            connectstr += " pass %s" % self.remote_pass
+        connectstr += "\r\n"
+
+        try:
+            sock = socket.socket()
+            sock.connect(( self.remote_host, self.remote_port ))
+
+            # Anmelden
+            sock.send(connectstr.encode())
+
+            # Auf Antwort warten.
+            sock.recv(255)
+
+            # APRS-Pakete senden
+            for f in frames:
+                sock.send(str(f.header).encode())
+                sock.send(b":")
+                sock.send(f.payload)
+                sock.send(b"\r\n")
+
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
+        except ConnectionRefusedError:
+            self.logger.error("Kann keine Verbindung zum APRS-Server '%s:%s' aufbauen. Es wird nicht alarmiert." % ( self.remote_host, self.remote_port ))
+
+
+
 # Konfiguration einlesen
 with open(ARGS.config) as f:
     CONFIG = Config(yaml.safe_load(f), "Ungültige Konfiguration")
@@ -1510,6 +1562,7 @@ TARGET_CLASSES = \
 [
     ( 'aprs_kiss_serial', TargetAprsKissSerial ),
     ( 'aprs_kiss_tcp',    TargetAprsKissTcp    ),
+    ( 'aprs_telnet',      TargetAprsTelnet     ),
 ]
 
 TARGET_CONFIG = CONFIG.get_subtree('target', "Ungültige Senken-Konfiguration")
