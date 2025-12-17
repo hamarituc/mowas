@@ -802,7 +802,7 @@ Folgende Parameter stehen zur Verfügung
 | `serial.cmd_down` | Binär-String     | leer           | Kommando, welches beim Beenden an das TNC geschickt wird |
 | `serial.cmd_pre`  | Binär-String     | leer           | Kommando, welches vor einem Sendezyklus an das TNC geschickt wird |
 | `serial.cmd_post` | Binär-String     | leer           | Kommando, welches nach einem Sendezyklus an das TNC geschickt wird |
-| `kiss.ports`      | Liste von Zahlen | leer           | Zeitstempel in der Positionsmeldung kodieren |
+| `kiss.ports`      | Liste von Zahlen | leer           | KISS-Ports, über die gesendet werden soll |
 
 Mit `serial.device` und `serial.baud` werden die Schnittstellenparameter des
 KISS-Modems angegeben. Jedes KISS-Moden kann mehrere Ports ansteuern. Diese
