@@ -988,6 +988,7 @@ class TargetAprs(Target):
 
         self.dstcall           = config_aprs.get_str('dstcall', 'APMOWA')
         self.mycall            = config_aprs.get_str('mycall')
+        self.symbol            = config_aprs.get_str('symbol', '\\!')
         self.digipath          = config_aprs.get_list('digipath', [ 'WIDE1-1' ])
         self.truncate          = config_aprs.get_bool('truncate_comment', True)
         self.beacon            = config_beacon.get_bool('enabled', True)
@@ -997,6 +998,9 @@ class TargetAprs(Target):
         self.max_areas         = config_beacon.get_int('max_areas', 0)
         self.bulletin_mode     = config_bulletin.get_str('mode', 'fallback').lower()
         self.bulletin_id       = config_bulletin.get_str('id', '0MOWAS')[0:6].ljust(6, ' ')
+
+        if len(self.symbol) != 2:
+            raise ConfigException("Ungültiges APRS-Symbol '%s'. Es muss aus genau zwei Zeichen bestehen." % self.symbol)
 
         if self.bulletin_mode not in [ 'never', 'fallback', 'always' ]:
             self.logger.warning("Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück." % self.bulletin_mode)
@@ -1324,7 +1328,7 @@ class TargetAprs(Target):
             # Wir betrachten alle Ereignisse einer Warnung als separate
             # APRS-Objekte.
             for infoidx, info in enumerate(capdata['info']):
-                symbol = APRSSymbol('\\', '\'')
+                symbol = APRSSymbol(self.symbol[0], self.symbol[1])
                 pos = self._get_pos(alert, info)
                 time = self._get_time(info, capdata, t)
                 comment = self._get_comment(info)

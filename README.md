@@ -659,6 +659,7 @@ werden durch `.` getrennt.
 |:------------------- | ----------------- | -------------- |:--------- |
 | `dstcall`           | String            | `APMOWA`       | Zielrufzeichen |
 | `mycall`            | String            | *erforderlich* | eigenes Rufzeichen |
+| `symbol`            | String            | `\!`           | APRS-Symbol |
 | `digipath`          | Liste von Strings | `WIDE1-1`      | Digi-Pfad |
 | `truncate_comment`  | Bool              | `true`         | Kommentare kürzen, um APRS-Spezifikation einzuhalten |
 | `beacon.enabled`    | Bool              | `true`         | Positionsmeldungen senden |
@@ -673,6 +674,10 @@ Das eigene Rufzeichen muss in `mycall` eingetragen werden. Dies kann auch eine
 AX.25-SSID enthalten. Das Zielrufzeichen `dstcall` wird für APRS nicht genutzt
 und kennzeichnet die verwendete APRS-Software. Es sollte beim Standardwert
 belassen werden.
+
+Über `symbol` wird die Darstellung auf der APRS-Karte gesteuert. Es sollte beim
+Standardwert (Emergency: gelbes Warndreieck mit Ausrufezeichen) belassen
+werden.
 
 Der Digipath legt fest, wie oft APRS-Pakete von Digipeatern wiederholt werden
 sollen. Mit `WIDE1-1` wird jedes Paket genau einmal wiederholt. Die Einstellung
