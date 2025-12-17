@@ -855,6 +855,14 @@ target:
           - 0
 ```
 
+Folgende Parameter stehen zur Verfügung
+
+| Einstellung   | Typ              | Standardwert   | Bedeutung |
+|:------------- | ---------------- | -------------- |:--------- |
+| `remote.host` | String           | *erforderlich* | Hostname des KISS-TNCs |
+| `remote.port` | Zahl             | *erforderlich* | TCP-Port des KISS-TNCs |
+| `kiss.ports`  | Liste von Zahlen | leer           | KISS-Ports, über die gesendet werden soll |
+
 Mit `remote.host` und `remote.port` werden die Netzwerkadresse (Hostname oder
 IP-Adresse inkl. TCP-Port) des KISS-Modems angegeben. Die KISS-Parameter sind
 identisch zum seriellen KISS-Modem.
