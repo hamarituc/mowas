@@ -49,8 +49,7 @@ target:
         beacon:
           prefix: 'MWC'
         bulletin:
-          mode: 'always'
-          id: '0MOWAS'
+          id: '0MWC'
       serial:
         device: '/dev/ttyUSB0'
         baud: 115200
