@@ -66,6 +66,13 @@ alternativ wie folgt eine virtuelle Python-Umgebung einrichten, z.B. unter
 # pip install -U -r requirements.txt
 ```
 
+Besonderes Augenmerk ist bei einer virtuellen Python-Umgebung für das
+Python-Paket `gdal` erforderlich. Es erfordert die entsprechenden
+`libgdal`-C-Biliothek, die über die Distribution installiert werden muss. Dabei
+muss die Version des Python-`gdal`-Pakets zur Version der `libgdal`-Biliothek
+passen. Ggf. ist in `requirements.txt` die Version von `gdal` entsprechend
+einzuschränken.
+
 Mit dem `source`-Befehl wird die Python-Umgebung betreten. Will man das Skript
 ohne vorherigen `source`-Befehl aufrufen, muss man stattdessen folgenden
 Befehl verwenden.

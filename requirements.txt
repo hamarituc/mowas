@@ -1,5 +1,11 @@
 aioax25
-gdal==3.9.*
+
+# Die GDAL-Version muss zu den Systempaketen passen. Im Zweifelsfall müssen
+# ältere GDAL-Python-Pakete installiert werden.
+gdal
+#gdal==3.6.*  # Debian Bookworm
+#gdal==3.10.* # Debian Trixie
+
 pytz
 requests
 pyserial
