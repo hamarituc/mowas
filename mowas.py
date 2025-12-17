@@ -823,6 +823,9 @@ class Filter:
             elif len(r) in [ 2, 3, 5, 9, 12 ]:
                 # Zu Kurze Regionalschlüssel ggf. erweitern
                 geocodes.append(r.ljust(12, "0"))
+            elif r == "0":
+                # Gesamtes Warngebiet als "0" akzeptieren
+                geocodes.append("000000000000")
             else:
                 raise ConfigException("Ungültiger Gebietsschlüssel '%s': Zu kurz." % r)
 
