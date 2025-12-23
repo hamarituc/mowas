@@ -109,6 +109,25 @@ def parse_duration(s):
 
 
 
+def parse_ax25addr(s):
+    x = s.split('-')
+
+    if len(x) == 1:
+        call = x
+        ssid = 0
+    elif len(x) == 2:
+        call = x[0]
+        try:
+            ssid = int(x[1])
+        except ValueError:
+            raise ConfigException("Ungültige SSID in AX.25-Adresse '%s'" % s)
+    else:
+        raise ConfigException("Ungültige AX.25-Adresse '%s'" % s)
+
+    return AX25Address(callsign = call, ssid = ssid)
+
+
+
 class Config:
     def __init__(self, tree, errmsg):
         if not isinstance(tree, dict):
@@ -1006,6 +1025,8 @@ class TargetAprs(Target):
             self.logger.warning("Unbekannter Bulletin-Modus '%s'. Falle auf Standardeinstellung 'fallback' zurück." % self.bulletin_mode)
             self.bulletin_mode = 'fallback'
 
+        self.digipath = [ parse_ax25addr(addr) for addr in self.digipath ]
+
 
     #
     # APRS kann im Endeffekt nur Punktkoordinaten behandeln. Es besteht eine
@@ -1205,7 +1226,7 @@ class TargetAprs(Target):
             self.dstcall,
             self.mycall,
             packet.encode(),
-            repeaters = [ AX25Address(addr) for addr in self.digipath ]
+            repeaters = self.digipath
         )
 
         return [ frame ]
@@ -1303,7 +1324,7 @@ class TargetAprs(Target):
                     self.dstcall,
                     self.mycall,
                     packet.encode(),
-                    repeaters = [ AX25Address(addr) for addr in self.digipath ]
+                    repeaters = self.digipath
                 )
             )
 
