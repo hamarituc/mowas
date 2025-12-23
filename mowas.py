@@ -602,7 +602,7 @@ class SourceBBKUrl(Source):
             r.raise_for_status()
         except requests.exceptions.HTTPError as e:
             self.logger.error("Fehler bei der Abfrage von '%s'." % self.url)
-            self.logger.eception(e)
+            self.logger.exception(e)
             return
 
         try:
