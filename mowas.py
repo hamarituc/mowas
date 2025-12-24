@@ -1238,7 +1238,17 @@ class TargetAprs(Target):
         calls = []
         for pid in pids:
             for pidx, p in enumerate(pos):
-                calls.append(( pid, p, chr(min(pidx, 26) + ord('A')) ))
+                # Wir erstellen die Nummerierung für die Teilgebiete in der
+                # Form A, B, ..., Z, AA, AB, ...
+                pidxstr = ""
+                while True:
+                    pidxstr = chr(ord('A') + (pidx % 26)) + pidxstr
+                    pidx = pidx // 26
+                    if pidx == 0:
+                        break
+                    pidx -= 1
+
+                calls.append(( pid, p, pidxstr ))
 
             # Wir benutzen nur die erste Persistent-ID um die Airtime gering zu
             # halten. Ggf. können wir überlegen, ob wir die Meldung für alle
@@ -1254,11 +1264,14 @@ class TargetAprs(Target):
                 call += pidx
 
             if infoidx is not None:
-                infoidxnum = infoidx
-                infoidxstr = ""
-                while infoidxnum:
-                    infoidxstr = (chr(ord('A') + (infoidxnum % 26))) + infoidxstr
-                call += infoidxstr
+                # Wenn eine Warnung aus mehreren Textmeldungen besteht, hängen
+                # wir die Nummer der Teilmeldung an.
+                if not multiarea:
+                    # Wenn wir alle Teilgebiete zusammenfassen, müssen wir die
+                    # Meldungnummer durch Bindestrich von der Persistent-ID
+                    # trennen.
+                    call += '-'
+                call += '%d' % infoidx
 
             if len(call) > 9:
                 newcall = call[:9]

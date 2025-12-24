@@ -729,6 +729,13 @@ Teilgebiet (`A`) der Warnung `2`. Entsprechend wäre `MOWA2B` das zweite
 Teilgebiet usw. Nummern werden erst wiederverwendet, wenn die zugehörige
 Warnung nach Ablauf der Wartezeit aus dem Cache entfernt wird.
 
+Enthält eine Warnung mehrere Textmeldungen, werden diese ebenfalls noch einmal
+separat nummeriert. Dieser Fall kommt in der Praxis selten bzw. vermutlich gar
+nicht vor, ist laut CAP-Standard aber denkbar. Die erste Meldung der Warnung
+`MOWA1A` würde als `MOWA1A1` kodiert, die zweite Meldung als `MOWA1A2`. Sollten
+Teilgebiete nicht nummeriert werden, wird die laufende Nummer von der
+Meldungsnummer durch `-` getrennt, z.B.: `MOWA1-1`, `MOWA1-2`, usw.
+
 Der Präfix wird mittels `beacon.prefix` festgelegt. Hierbei ist zu beachten,
 dass jede Instanz dieses Programms eigene laufende Nummern vergibt. Damit bei
 benachbarten Installationen keine Überschneidungen der Bakenkennung auftreten,
