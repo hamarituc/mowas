@@ -29,7 +29,7 @@ cache:
   path: 'cache/cache.json'
 
 target:
-  aprs_kiss_serial:
+  aprs_kiss_tcp:
     DB0CSD:
       schedule:
         10m: '1m'
@@ -50,9 +50,9 @@ target:
           prefix: 'MWC'
         bulletin:
           id: '0MWC'
-      serial:
-        device: '/dev/ttyUSB0'
-        baud: 115200
+      remote:
+        host: 'localhost'
+        port: 8001
       kiss:
         ports:
           - 0
