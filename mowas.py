@@ -356,6 +356,35 @@ class Source:
         self.sname = sname
         self.logger = logging.getLogger('mowas.source.%s.%s' % ( self.stype, self.sname ))
 
+        self._etag_cache = {}
+
+
+    def fetch_etag(self, url):
+        headers = {}
+        if url in self._etag_cache:
+            headers['If-None-Match'] = self._etag_cache[url]
+
+        r = requests.get(url, headers = headers)
+        try:
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            self.logger.warning("Fehler beim Download von '%s'." % url)
+            self.logger.exception(e)
+            raise
+
+        if r.status_code == 304:
+            # Wir sind bereits dem neusten Stand
+            self.logger.debug("Inhalt von '%s' hat sich nicht geändert." % url)
+            return None
+
+        self.logger.debug("Download von '%s' erfolgreich." % url)
+
+        # Aktuelles ETag im Cache vermerken
+        self._etag_cache[url] = r.headers['ETag']
+
+        return r
+
+
     def purge(self, valid):
         pass
 
@@ -597,12 +626,13 @@ class SourceBBKUrl(Source):
 
 
     def fetch(self):
-        r = requests.get(self.url)
         try:
-            r.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            self.logger.error("Fehler bei der Abfrage von '%s'." % self.url)
-            self.logger.exception(e)
+            r = self.fetch_etag(self.url)
+        except requests.exceptions.HTTPError:
+            return
+
+        # Kein Download, weil der Cache bereits auf dem aktuellsten Stand ist.
+        if r is None:
             return
 
         try:
