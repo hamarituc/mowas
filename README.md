@@ -1005,3 +1005,90 @@ Reihe von Paketen über die Soundkarte ausgeben.
 ```
 $ ./mowas.py -c mowas.yml
 ```
+
+### APRS-Server mit aprsc
+
+Zunächst müssen wir einen aprsc-Server aufsetzen. Hierfür legen wir eine
+einfache Beispielkonfiguration unter `/tmp/aprsc.conf` an:
+
+```
+ServerId   NOCALL
+PassCode   0
+MyAdmin    "My Name, MYCALL"
+MyEmail    email@example.com
+
+RunDir /tmp/data
+
+Listen "Client-Defined Filters"                   igate tcp ::  14580
+```
+
+Vor dem Starten des Servers werden noch einige temporäre Verzeichnisse
+benötigt. Diese können im Anschluss gelöscht werden.
+
+```
+$ mkdir /tmp/data
+$ mkdir /tmp/logs
+```
+
+Anschließend können wir den aprsc-Server starten.
+
+```
+$ /opt/aprsc/sbin/aprsc -c /tmp/aprsc.conf -r /tmp/logs
+```
+
+Dieses Setup ist jedoch nur für Testzwecke geeignet. Für den Produktiveinsatz
+sollte aprsc immer unter einem eigenen Nutzer innerhalb einer `chroot`-Umgebung
+laufen.
+
+Per `telnet` kann man sich wie folgt zum Server verbinden.
+
+```
+$ telnet 127.0.0.1 14580
+Trying 127.0.0.1...
+Connected to 127.0.0.1.
+Escape character is '^]'.
+# aprsc 2.1.19-
+user DL1XYZ filter u/APMOWA
+# logresp DL1XYZ unverified, server NOCALL
+```
+
+Das MoWaS-Tool wird dann wie folgt konfiguriert, um bundesweit alle Warnungen
+per APRS auszugeben.
+
+```yaml
+source:
+  bbk_url:
+    MOWAS:
+      url: 'https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json'
+
+cache:
+  path: 'cache/cache.json'
+
+target:
+  aprs_telnet:
+    DIREWOLF:
+      schedule:
+        10m: '1m'
+        1h: '5m'
+        1d: '10m'
+      filter:
+        geocodes:
+          - '0'
+      aprs:
+        mycall: 'DB0XXX'
+        beacon:
+          prefix: 'MOWA'
+        bulletin:
+          id: '0MOWA'
+      remote:
+        host: 'localhost'
+        user: 'DB0XXX'
+        pass: '24480'
+```
+
+Startet man den MoWaS-Dienst, sollten innerhalb der `telnet`-Sitzung nun die
+Warnungen auftauchen.
+
+```
+$ ./mowas.py -c mowas.yml
+```
