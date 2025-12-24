@@ -668,7 +668,7 @@ werden durch `.` getrennt.
 | `beacon.prefix`     | String            | `MOWA`         | Präfix für die Objektkennung von Positionsmeldungen |
 | `beacon.time`       | Bool              | `true`         | Zeitstempel in der Positionsmeldung kodieren |
 | `beacon.compressed` | Bool              | `false`        | komprimiertes Format für Zeitstempel anwenden |
-| `beacon.max_areas`  | Zahl              | `0`            | Höchstanzahl an Teilgebieten, die alarmiert werden |
+| `beacon.max_areas`  | Zahl              | `5`            | Höchstanzahl an Teilgebieten, die alarmiert werden |
 | `bulletin.mode`     | String            | `fallback`     | Festlegungen, wann Bulletins gesendet werden: `never`, `fallback`, `always` |
 | `bulletin.id`       | String            | `0MOWAS`       | Kennung für Bulletin-Meldungen |
 
