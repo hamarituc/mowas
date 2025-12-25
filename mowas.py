@@ -177,7 +177,7 @@ class Config:
 
     def get_bin(self, key, default = None, null = False):
         value = self.get_str(key, default, null)
-        if value is None:
+        if value is None and null:
             return None
 
         try:
@@ -690,18 +690,18 @@ class SourceBBKUrl(Source):
         try:
             r = self.fetch_etag(self.url)
         except requests.exceptions.HTTPError:
-            return
+            return []
 
         # Kein Download, weil der Cache bereits auf dem aktuellsten Stand ist.
         if r is None:
-            return
+            return []
 
         try:
             capdata = r.json()
         except requests.exceptions.JSONDecodeError as e:
             self.logger.error("Fehler beim Laden der Rückgabe von '%s'." % self.url)
             self.logger.exception(e)
-            return
+            return []
 
         for alertdata in capdata:
             yield Alert(alertdata)
