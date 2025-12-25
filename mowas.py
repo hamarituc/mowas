@@ -199,8 +199,10 @@ class Config:
         return value
 
 
-    def get_list(self, key, default = None):
-        value = self._get_value(key, default)
+    def get_list(self, key, default = None, null = False):
+        value = self._get_value(key, default, null)
+        if value is None and null:
+            return None
         if not isinstance(value, list):
             raise ConfigException("Ungültiges Attribut '%s': Liste erwartet." % key)
         return value
@@ -211,6 +213,65 @@ class Config:
         if not isinstance(value, dict):
             raise ConfigException("Ungültiges Attribut '%s': Dictionary erwartet." % key)
         return value
+
+
+    def get_enum(self, key, values, default = None, null = False):
+        value = self.get_str(key, default, null)
+        if value is None and null:
+            return None
+
+        if not isinstance(value, str):
+            raise ConfigException("Ungültiges Attribut '%s': '%s' ist kein String." % ( key, value ))
+
+        # Wir ignorieren die Groß- und Kleinschreibung
+        value = value.lower()
+        valid = { v.lower() for v in values }
+        if value not in valid:
+            raise ConfigException(
+                "Ungültiges Attribut '%s': Einen der folgenden Werte erwartet: '%s'" %
+                (
+                    key,
+                    "', '".join(values)
+                )
+            )
+
+        return value
+
+
+    def get_enum_list(self, key, values, default = None, null = False):
+        value = self._get_value(key, default, null)
+        if value is None:
+            if null:
+                return None
+
+        elif isinstance(value, str):
+            # Einelementige Listen akzeptieren wir auch als einfachen String
+            return [ self.get_enum(key, values, default, null) ]
+
+        elif isinstance(value, list):
+            valuelist = self.get_list(key, default, null)
+
+            valid = { v.lower() for v in values }
+            result = []
+            for v in valuelist:
+                if not isinstance(v, str):
+                    raise ConfigException("Ungültiges Attribut '%s': '%s' ist kein String." % ( key, v ))
+
+                v = v.lower()
+                if v not in valid:
+                    raise ConfigException(
+                        "Ungültiges Attribut '%s': Einen der folgenden Werte erwartet: '%s'" %
+                        (
+                            key,
+                            "', '".join(values)
+                        )
+                    )
+
+                result.append(v)
+
+            return result
+
+        raise ConfigException("Ungültiges Attribut '%s': Liste von Strings erwartet." % key)
 
 
 
