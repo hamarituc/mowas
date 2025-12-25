@@ -999,7 +999,7 @@ class Filter:
         for r in self.geocodes:
             self.geocodes_super |= self._area_superset(r)
 
-        # Maximales Altert eine Warnung bei Erstalarmierung
+        # Maximales Alter einer Warnung bei Erstalarmierung
         self.max_age = config.get_duration('max_age', '4h')
 
 
