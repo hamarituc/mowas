@@ -1686,13 +1686,6 @@ with open(ARGS.config) as f:
 
 
 # Logging konfigurieren
-log_config = CONFIG.get_subtree('logging', "Ungültige Logging-Konfiguration", optional = True)
-
-log_fmt = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
-log_level = ARGS.log_level or log_config.get_str('level', 'warning').lower()
-log_console = True if ARGS.log_console else log_config.get_bool('console', True)
-log_file    = ARGS.log_file or log_config.get_str('file', null = True)
-
 LOG_LEVELS = \
 {
     'error':   logging.ERROR,
@@ -1700,6 +1693,13 @@ LOG_LEVELS = \
     'info':    logging.INFO,
     'debug':   logging.DEBUG,
 }
+
+log_config = CONFIG.get_subtree('logging', "Ungültige Logging-Konfiguration", optional = True)
+
+log_fmt     = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
+log_level   = ARGS.log_level or log_config.get_enum('level', LOG_LEVELS.keys(), 'warning')
+log_console = True if ARGS.log_console else log_config.get_bool('console', True)
+log_file    = ARGS.log_file or log_config.get_str('file', null = True)
 
 LOGGER = logging.getLogger('mowas')
 
