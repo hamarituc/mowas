@@ -554,6 +554,10 @@ target:
 | Einstellung | Typ               | Standardwert   | Bedeutung |
 |:----------- | ----------------- | -------------- |:--------- |
 | `geocodes`  | Liste von Strings | *erforderlich* | Regionalbereiche der Meldungen |
+| `category`  | Liste von Strings | leer           | Kategorien der Meldungen |
+| `urgency`   | Liste von Strings | leer           | Dringlichkeit der Meldungen |
+| `severity`  | Liste von Strings | leer           | Schweregrad der Meldung |
+| `certainty` | Liste von Strings | leer           | Gewissheit der Meldung |
 | `max_age`   | Zeitangabe        | `4h`           | Maximales Alter einer Warnung |
 
 Bei `geocodes` handelt es sich um eine Liste amtlicher Regionalschlüssel. Jede
@@ -570,14 +574,6 @@ Regionalschlüssel ...
    Schlüssel eines Landkreises eingetragen ist, werden auch Warnungen für das
    übergeordnete Bundesland weiterverarbeitet).
 
-Neben dem örtlichen Kriterium muss die Warnung auch neu genug sein, um
-verarbeitet zu werden. Standardmäßig werden nur Warnungen verarbeitet, die
-jünger als 4 Stunden sind. Auf diese Weise wird verhindert, dass beim
-erstmaligen Start des Warndienstes oder nach einem längeren Ausfall erst alle
-zurückliegenden Warnungen aussendet, die durch ihr Alter ggf. gar nicht mehr
-relevant sind. Es zählt nur der Zeitraum zwischen Ausgabe und Erstverarbeitung
-der Warnung. Der Wiederholungsrhythmus wird dadurch nicht eingeschränkt.
-
 Beispiel:
 
 ```yaml
@@ -588,7 +584,6 @@ target:
         geocodes:
           - '14511'
           - '14521'
-        max_age: '8h'
 ```
 
 In diesem Fall wird das Warngebiet auf die Stadt Chemnitz (ARS 14511) und den
@@ -606,6 +601,85 @@ verarbeitet, obwohl dieser geografisch recht Nahe gelegen ist.
 
 Regionalschlüssel für Gebietskörperschaften können unter
 https://opengovtech.de/ars/ recherchiert werden.
+
+Ferner lassen sich die Meldungen nach ihrer Einstufung filtern. Hierbei wird
+unterschieden zwischen:
+
+ * Kategorie (`category`)
+   * `Geo`       → geologische bzw. geophysische Gefahren, z.B. Erdbeben,
+                   Erdrutsch
+   * `Met`       → Wetterwarnungen, Hochwasser
+   * `Safety`    → Allgemeine Notfälle und Gefahren für die öffentliche Ordnung
+   * `Security`  → Meldungen von Sicherheitsbehörden, Polizei, etc.
+   * `Rescue`    → Rettungs- und Bergungsereignisse
+   * `Fire`      → Brände
+   * `Health`    → Gefahren in Bezug auf medizinische Aspekte oder die
+                   öffentliche Gesundheit
+   * `Env`       → Gefahren für die Umwelt, Freisetzung von Gefahrstoffen
+   * `Transport` → öffentliche Transportinfrastruktur
+   * `Infra`     → öffentliche Dienstleistungen und Infrastruktur (außer
+                   Transportinfrastruktur), Telekommuniktion
+   * `CBRNE`     → atomare, biologische oder chemische Gefahren einschließlich
+                   Gefahren durch Sprengstoffe
+   * `Other`     → andere Ereignisse
+ * Dringlichkeit (`urgency`)
+   * `Immediate` → Es muss sofort gehandelt werden
+   * `Expected`  → Es ist kuzfristig zu handeln (innerhalb der nächsten Stunde)
+   * `Future`    → Es ist in der nahen Zukunft zu handeln
+   * `Past`      → Es sind keine Maßnahmen mehr notwendig
+   * `Unknown`   → keine Angabe
+ * Schweregrad (`severity`)
+   * `Extreme`   → Außerordentliche Gefahr für Leib und Leben oder Sachwerte
+   * `Severe`    → Hohe Gefahr für Leib und Leben oder Sachwerte
+   * `Moderate`  → Gefahren für Leib und Leben oder Sachwerte sind möglich
+   * `Minor`     → Minimale bis keine Gefahr für Leib und Leben oder Sachwerte
+   * `Unknown`   → keine Angabe
+ * Gewissheit (`certainty`)
+   * `Observed`  → Das Ereignis ist bestätigt
+   * `Likely`    → Der Eintritt des Ereignisses ist sehr wahrscheinlich (>50%)
+   * `Possible`  → Der Eintritt des Ereignisses ist möglich aber nicht
+                   wahrscheinlich (<=50%)
+   * `Unlikely`  → Der Eintritt des Ereignisses ist nahezu ausgeschlossen
+   * `Unknown`   → keine Angabe
+
+Für all diese Kriterien kann eine Liste der zu berücksichtigenden Werte
+angegeben werden. Ist ein Kriterium nicht aufgeführt, so wird nicht bzgl.
+dieses Kriteriums gefiltert und dementsprechend alle Meldungen berücksichtigt.
+
+Beispiel:
+
+```
+target:
+  TYP:
+    NAME:
+      filter:
+        severity:
+          - 'severe'
+          - 'moderate'
+          - 'unknown'
+        certainty:
+          - 'observed'
+          - 'likely'
+          - 'unknown'
+```
+
+Mit diesem Filter werden alle Ereigniss erfasst, von denen mind. eine hohe
+Gefahr ausgeht und die mind. sehr wahrscheinlich sind. Sicherheitshalber werden
+nicht eingestufte Meldungen ebenfalls erfasst.
+
+Die ausgebende Stelle kann eine Meldung in mehrere Kategorien einordnen. Beim
+Austritt von Gefahrstoffen könnte z.B. sowohl `CBRNE` als auch `Env` zutreffen.
+Damit eine Meldung berücksichtigt wird, reicht es aus, wenn der Filter mind.
+eine kodierte Kategorie erfasst.
+
+Neben den sachlichen Kriterien muss die Warnung auch neu genug sein, um
+verarbeitet zu werden. Standardmäßig werden nur Warnungen verarbeitet, die
+jünger als 4 Stunden sind. Auf diese Weise wird verhindert, dass beim
+erstmaligen Start des Warndienstes oder nach einem längeren Ausfall erst alle
+zurückliegenden Warnungen aussendet, die durch ihr Alter ggf. gar nicht mehr
+relevant sind. Es zählt nur der Zeitraum zwischen Ausgabe und Erstverarbeitung
+der Warnung. Der Wiederholungsrhythmus wird dadurch nicht eingeschränkt. Der
+Schwellwert kann durch `max_age` heraufgesetzt werden.
 
 ### APRS
 

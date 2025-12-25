@@ -897,6 +897,50 @@ class Cache:
 
 
 class Filter:
+    FILTER_CATEGORY = \
+    [
+        'Geo',
+        'Met',
+        'Safety',
+        'Security',
+        'Rescue',
+        'Fire',
+        'Health',
+        'Env',
+        'Transport',
+        'Infra',
+        'CBRNE',
+        'Other',
+    ]
+
+    FILTER_URGENCY = \
+    [
+        'Immediate',
+        'Expected',
+        'Future',
+        'Past',
+        'Unknown',
+    ]
+
+    FILTER_SEVERITY = \
+    [
+        'Extreme',
+        'Severe',
+        'Moderate',
+        'Minor',
+        'Unknown',
+    ]
+
+    FILTER_CERTAINTY = \
+    [
+        'Observed',
+        'Likely',
+        'Possible',
+        'Unlikely',
+        'Unknown',
+    ]
+
+
     # Übergeordnete Bereiche bestimmen
     def _area_superset(self, geocode : str) -> set:
         areas = []
@@ -917,6 +961,13 @@ class Filter:
 
     def __init__(self, config, logger):
         self.logger = logger
+
+        self.category  = config.get_enum_list('category',  self.FILTER_CATEGORY,  None, null = True)
+        self.urgency   = config.get_enum_list('urgency',   self.FILTER_URGENCY,   None, null = True)
+        self.severity  = config.get_enum_list('severity',  self.FILTER_SEVERITY,  None, null = True)
+        self.certainty = config.get_enum_list('certainty', self.FILTER_CERTAINTY, None, null = True)
+
+        self.category = set(self.category)
 
         # Gebietsschlüssel auf Plausibilität prüfen.
         geocodes = []
@@ -1010,6 +1061,23 @@ class Filter:
         for infoidx, info in enumerate(alert.capdata['info']):
             # Abgelaufene Meldungen verwerfen
             if 'expires' in info and info['expires'] < t:
+                continue
+
+            # Metadaten filtern
+            if 'category' in info and self.category is not None and \
+               len({ v.lower() for v in info['category'] } & self.category) == 0:
+                continue
+
+            if 'urgency' in info and self.urgency is not None and \
+               info['urgency'] not in self.urgency:
+                continue
+
+            if 'severity' in info and self.severity is not None and \
+               info['severity'] not in self.severity:
+                continue
+
+            if 'certainty' in info and self.certainty is not None and \
+               info['certainty'] not in self.certainty:
                 continue
 
             # Ohne Ortsbezug können wir die Meldung nicht filtern.
