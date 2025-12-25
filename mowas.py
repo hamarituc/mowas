@@ -891,28 +891,108 @@ class Filter:
         self.max_age = config.get_duration('max_age', '4h')
 
 
-    def match_age(self, alert, ttype, tname, t):
-        tfirst, tlast = alert.tx_status(ttype, tname)
-
+    #
+    # Diese Funktion filtert alle relevanten Teile aus einer Warnung `alert`
+    # heraus. `t` ist die aktuelle Zeit. `tfirst` und `tlast` sind der
+    # erstmalige bzw. letztmalige Übertragungszeitpunkt auf der entsprechenden
+    # Senke.
+    #
+    # Statt einem kompletten CAP-Datensatz werden nur die Listenindexe
+    # verschachtelter Elemente zurückgegeben. Die erleichtert die Erzeugung
+    # eines Gesamtdatensatzes, wenn mehrere Filter zur Anwendung kommen, deren
+    # Ergebnisse vereinigt werden.
+    #
+    # Ein CAP-Datensatz enthält mehrere `info`-Elemente. Ein `info`-Element
+    # enthält wiederum mehrere `area`-Elemente. Ein `area`-Element, kann
+    # weitere `geocode`-Elemente enthalten. Bei folgende Rückgabe ...
+    #
+    # ```
+    # {
+    #   'info':
+    #   {
+    #     0:
+    #     {
+    #       'area':
+    #       {
+    #         3:
+    #         {
+    #           'geocode': {0}
+    #         },
+    #         ...
+    #       }
+    #     },
+    #     ...
+    #   }
+    # }
+    # ```
+    #
+    # ... ist nur ...
+    #
+    #  * das `info`-Element mit Index 0
+    #  * das `area`-Elemente mit Index 3 dieses `info`-Elements
+    #  * das `geocode`-Element mit Index 0 dieses `area`-Elements
+    #
+    # ... nach Anwendung des Filters relevant.
+    #
+    def match(self, alert, t, tfirst, tlast):
+        # Warnungen, die noch nie übertragen wurden, aber zu alt sind,
+        # verwerfen wir. Sie kommen ggf. dadurch zu Stande, dass der Cache
+        # leer war. Wir vermeiden es somit, veraltete Warnungen erneut zu
+        # auszulösen.
         if tfirst is None and alert.capdata['sent'] + self.max_age <= t:
-            return False
+            return None
 
-        return True
+        if 'info' not in alert.capdata:
+            return None
 
+        infos = {}
+        for infoidx, info in enumerate(alert.capdata['info']):
+            # Abgelaufene Meldungen verwerfen
+            if 'expires' in info and info['expires'] < t:
+                continue
 
-    def match_geo(self, geocode):
-        # Eine Nachricht wird übernommen, wenn sie unterhalb der von uns
-        # spezifizierten Gebiete liegt oder für eines der uns
-        # übergeordneten Gebiete kodiert ist.
-        geocodes = []
-        for g in geocode:
-            gcode = g['value']
-            geocode_super = self._area_superset(gcode)
-            if gcode in self.geocodes_super or \
-               len(geocode_super & self.geocodes) > 0:
-                geocodes.append(g)
+            # Ohne Ortsbezug können wir die Meldung nicht filtern.
+            if 'area' not in info:
+                continue
 
-        return geocodes
+            areas = {}
+            for areaidx, area in enumerate(info['area']):
+                # Ohne Gebietsschlüssel können wir die Warnung nicht
+                # verarbeiten. Ggf. könnten wir bei der Veröffentlichung
+                # von Polygonen auf geometrische Überschneidungen mit den
+                # von uns spezifierten Warngebieten prüfen.
+                if 'geocode' not in area:
+                    continue
+
+                # Eine Nachricht wird übernommen, wenn sie unterhalb der von
+                # uns spezifizierten Gebiete liegt oder für eines der uns
+                # übergeordneten Gebiete kodiert ist.
+                geocodes = set()
+                for gidx, g in enumerate(area['geocode']):
+                    gcode = g['value']
+                    geocode_super = self._area_superset(gcode)
+                    if gcode in self.geocodes_super or \
+                       len(geocode_super & self.geocodes) > 0:
+                        geocodes.add(gidx)
+
+                if len(geocodes) == 0:
+                    continue
+
+                if areaidx not in areas:
+                    areas[areaidx] = {}
+                areas[areaidx]['geocode'] = geocodes
+
+            if len(areas) == 0:
+                continue
+
+            if infoidx not in info:
+                infos[infoidx] = {}
+            infos[infoidx]['area'] = areas
+
+        if len(infos) == 0:
+            return None
+
+        return { 'info': infos }
 
 
 
@@ -971,57 +1051,36 @@ class Target:
 
     def query(self, alerts, t):
         for alert in alerts:
-            # Warnungen, die noch nie übertragen wurden, aber zu alt sind,
-            # verwerfen wir. Sie kommen ggf. dadurch zu Stande, dass der Cache
-            # leer war. Wir vermeiden es somit, veraltete Warnungen erneut zu
-            # auszulösen.
-            if not self.filter.match_age(alert, self.ttype, self.tname, t):
+            tfirst, tlast = alert.tx_status(self.ttype, self.tname)
+
+            filterids = self.filter.match(alert, t, tfirst, tlast)
+            if filterids is None:
                 continue
+
+            # Neuen CAP-Datensatz erstellen, der nur die für den Filter
+            # relevanten Informationen enthält.
+            capdata = copy.deepcopy(alert.capdata)
+
+            infosnew = []
+            for infoidx, infodata in filterids.get('info', {}).items():
+                info = capdata['info'][infoidx]
+                areasnew = []
+                for areaidx, areadata in infodata.get('area', {}).items():
+                    area = info['area'][areaidx]
+                    geocodesnew = []
+                    for geocodeidx in areadata.get('geocode', set()):
+                        geocode = area['geocode'][geocodeidx]
+                        geocodesnew.append(geocode)
+                    area['geocode'] = geocodesnew
+                    areasnew.append(area)
+                info['area'] = areasnew
+                infosnew.append(info)
+            capdata['info'] = infosnew
 
             # Nachrichten nur wiederholen, wenn es das Wiederholungsintervall
             # verlangt.
             if not self.sched.tx_required(alert, self.ttype, self.tname, t):
                 continue
-
-            capdata = copy.deepcopy(alert.capdata)
-
-            if 'info' not in capdata:
-                continue
-
-            infos = []
-            for info in capdata['info']:
-                # Abgelaufene Meldungen verwerfen
-                if 'expires' in info and info['expires'] < t:
-                    continue
-
-                if 'area' not in info:
-                    continue
-
-                areas = []
-                for area in info['area']:
-                    # Ohne Gebietsschlüssel können wir die Warnung nicht
-                    # verarbeiten. Ggf. könnten wir bei der Veröffentlichung
-                    # von Polygonen auf geometrische Überschneidungen mit den
-                    # von uns spezifierten Warngebieten prüfen.
-                    if 'geocode' not in area:
-                        continue
-
-                    area['geocode'] = self.filter.match_geo(area['geocode'])
-                    if len(area['geocode']) == 0:
-                        continue
-
-                    areas.append(area)
-
-                if len(areas) == 0:
-                    continue
-
-                info['area'] = areas
-                infos.append(info)
-
-            if len(infos) == 0:
-                continue
-
-            capdata['info'] = infos
 
             yield alert, capdata
 
