@@ -1076,15 +1076,15 @@ class Filter:
                 continue
 
             if 'urgency' in info and self.urgency is not None and \
-               info['urgency'] not in self.urgency:
+               info['urgency'].lower() not in self.urgency:
                 continue
 
             if 'severity' in info and self.severity is not None and \
-               info['severity'] not in self.severity:
+               info['severity'].lower() not in self.severity:
                 continue
 
             if 'certainty' in info and self.certainty is not None and \
-               info['certainty'] not in self.certainty:
+               info['certainty'].lower() not in self.certainty:
                 continue
 
             # Ohne Ortsbezug können wir die Meldung nicht filtern.
