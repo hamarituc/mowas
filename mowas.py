@@ -967,7 +967,8 @@ class Filter:
         self.severity  = config.get_enum_list('severity',  self.FILTER_SEVERITY,  None, null = True)
         self.certainty = config.get_enum_list('certainty', self.FILTER_CERTAINTY, None, null = True)
 
-        self.category = set(self.category)
+        if self.category is not None:
+            self.category = set(self.category)
 
         # Gebietsschlüssel auf Plausibilität prüfen.
         geocodes = []
