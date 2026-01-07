@@ -969,6 +969,12 @@ class Filter:
 
         if self.category is not None:
             self.category = set(self.category)
+        if self.urgency is not None:
+            self.urgency = set(self.urgency)
+        if self.severity is not None:
+            self.severity = set(self.severity)
+        if self.certainty is not None:
+            self.certainty = set(self.certainty)
 
         # Gebietsschlüssel auf Plausibilität prüfen.
         geocodes = []
